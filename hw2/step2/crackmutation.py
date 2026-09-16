@@ -32,8 +32,8 @@ def main():
     passwords = ip.readlines()
     ip.close()
 
-    #mutations = [''.join(t) for n in (1, 2) for t in itertools.product(alphabet, repeat=1)]
-    mutations = [''.join(t) for t in itertools.product(alphabet, repeat=1)]
+    mutations = [''.join(t) for n in (1, 2) for t in itertools.product(alphabet, repeat=n)]
+    #mutations = [''.join(t) for t in itertools.product(alphabet, repeat=1)]
     prepended = (s + password for password, s in itertools.product(passwords, mutations))
     appended = (password + s for password, s in itertools.product(passwords, mutations))
 
