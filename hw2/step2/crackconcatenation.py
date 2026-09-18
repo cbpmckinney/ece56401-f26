@@ -54,32 +54,17 @@ def product_size(*iterables):
 
 
 def main():
-    
-    #alphabet = string.ascii_letters + string.digits + string.punctuation
-    alphabet = string.digits + string.punctuation
 
     ip = open('common.txt', 'r')
     fp = open('results-mutation1.txt', 'w')
 
     passwords = ip.read().splitlines()
-    #print(passwords)
     ip.close()
 
+    all_candidates = [''.join(t) for t in itertools.product(passwords, repeat=2)]
 
-    #mutations = [''.join(t) for n in (1, 2) for t in itertools.product(alphabet, repeat=n)]
-    # Change to only n=1 for tractability.  Otherwise it'll take 100 days!
-    mutations = [''.join(t) for t in itertools.product(alphabet, repeat=2)]
-    #prepended = (s + password for password, s in itertools.product(passwords, mutations))
-    appended = (password + s for password, s in itertools.product(passwords, mutations))
-
-    #all_candidates =  itertools.chain(appended, prepended)
-    all_candidates = appended
-    #for word in all_candidates:
-    #    print(word, end='')
-
-    
     count = 0
-    total = 1*product_size(passwords, mutations)
+    total = product_size(passwords, passwords)
 
     start = time.perf_counter()
 
@@ -99,14 +84,14 @@ def main():
                 fp.write(f"SUCCESS!  Password is: {result}")
                 fp.close()
                 pool.terminate()
-                send_notification('Hashing Success (mutation)!', body=f'Found password: {result}')
+                send_notification('Hashing Success (concatenation common)!', body=f'Found password: {result}')
 
                 exit(0)
 
     print('FAILURE!')
     fp.write('FAILURE!')
     fp.close()
-    send_notification('Hashing failure (mutation) :(', body=f'Hashing failed')
+    send_notification('Hashing failure (concatenation common) :(', body=f'Hashing failed')
 
 
 
