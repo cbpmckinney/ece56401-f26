@@ -54,32 +54,19 @@ def product_size(*iterables):
 
 
 def main():
+
+    fp = open('results-random.txt', 'w')
     
-    #alphabet = string.ascii_letters + string.digits + string.punctuation
-    alphabet = string.digits + string.punctuation
+    alphabet = string.ascii_letters + string.digits + string.punctuation
+    repeat2 = [''.join(t) for t in itertools.product(alphabet, repeat = 2)]
+    repeat3 = [''.join(t) for t in itertools.product(alphabet, repeat = 3)]
+    repeat4 = [''.join(t) for t in itertools.product(alphabet, repeat = 4)]
 
-    ip = open('common.txt', 'r')
-    fp = open('results-mutation1.txt', 'w')
-
-    passwords = ip.read().splitlines()
-    #print(passwords)
-    ip.close()
-
-
-    #mutations = [''.join(t) for n in (1, 2) for t in itertools.product(alphabet, repeat=n)]
-    # Change to only n=1 for tractability.  Otherwise it'll take 100 days!
-    mutations = [''.join(t) for t in itertools.product(alphabet, repeat=2)]
-    #prepended = (s + password for password, s in itertools.product(passwords, mutations))
-    appended = (password + s for password, s in itertools.product(passwords, mutations))
-
-    #all_candidates =  itertools.chain(appended, prepended)
-    all_candidates = appended
-    #for word in all_candidates:
-    #    print(word, end='')
-
+    all_candidates = itertools.chain(repeat2, repeat3, repeat4)
+                
     
     count = 0
-    total = 1*product_size(passwords, mutations)
+    total = (len(alphabet))**2 + (len(alphabet))**3 + (len(alphabet))**4
 
     start = time.perf_counter()
 
@@ -99,14 +86,14 @@ def main():
                 fp.write(f"SUCCESS!  Password is: {result}")
                 fp.close()
                 pool.terminate()
-                send_notification('Hashing Success (mutation)!', body=f'Found password: {result}')
+                send_notification('Hashing Success (random)!', body=f'Found password: {result}')
 
                 exit(0)
 
     print('FAILURE!')
     fp.write('FAILURE!')
     fp.close()
-    send_notification('Hashing failure (mutation) :(', body=f'Hashing failed')
+    send_notification('Hashing failure (random) :(', body=f'Hashing failed')
 
 
 
