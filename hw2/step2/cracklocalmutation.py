@@ -1,3 +1,6 @@
+# Local mutation: attempts capitalization, leetspeak substitution, reversal, vanilla
+# Does not append anything.  crackmutation.py does the appending/prepending case.
+
 import itertools
 import string
 import legacycrypt as crypt
@@ -8,6 +11,19 @@ from datetime import timedelta
 
 import smtplib
 from email.message import EmailMessage
+
+leet_map = {
+    'a': '4',
+    'e': '3',
+    'i': '1',
+    'o': '0',
+    's': '5',
+    't': '7',
+    'b': '8',
+    'g': '9',
+    'l': '1',
+}
+
 
 
 def send_notification(subject, body):
@@ -52,14 +68,23 @@ def case_variants(word):
     choices = [tuple({c.lower(), c.upper()}) for c in word]
     return (''.join(t) for t in itertools.product(*choices))
 
+
 def case_variant_count(word):
     return 2 ** sum(1 for c in word if c.lower() != c.upper())
 
 
-def main():
-    
+def leet_variants(word):
+    choices = [(c, leet_map[c]) if c in leet_map else (c,) for c in word]
+    return (''.join(t) for t in itertools.product(*choices))
 
-    ip = open('common.txt', 'r')
+
+def leet_variant_count(word):
+    return 2 ** sum(1 for c in word if c in leet_map)
+
+
+
+def main():
+    ip = open('all.txt', 'r')
     fp = open('results-localmutation.txt', 'w')
 
     passwords = ip.read().splitlines()
@@ -69,15 +94,17 @@ def main():
     firstcap = (password.capitalize() for password in passwords)
     reversed = (password[::-1] for password in passwords )
     allcap = (password.upper() for password in passwords)
-    fullcase = (v for password in passwords for v in case_variants(password))
+    #leetcase = (v for password in passwords for v in leet_variants(password))
+    #fullcase = (v for password in passwords for v in case_variants(password))
 
     
-    all_candidates = itertools.chain(passwords, reversed, firstcap, allcap)
+    all_candidates = itertools.chain(passwords, reversed, firstcap, allcap)#, leetcase, fullcase)
     
     count = 0
     fullcasecount = sum(case_variant_count(password) for password in passwords)
+    leetcount = sum(leet_variant_count(password) for password in passwords)
     
-    total = 4*len(passwords)
+    total = 3*len(passwords)# + leetcount + fullcasecount
 
 
     start = time.perf_counter()
@@ -102,7 +129,7 @@ def main():
                 fp.write(f"SUCCESS!  Password is: {result}")
                 fp.close()
                 pool.terminate()
-                send_notification('Hashing Success (mutation)!', body=f'Found password: {result}')
+                send_notification('Hashing Success (local mutation)!', body=f'Found password: {result}')
                 print(f'Started at: {start}')
                 print(f'Ended at: {time.perf_counter()}')
                 print(f'Time used: {time.perf_counter()-start}')
@@ -113,7 +140,7 @@ def main():
     print('FAILURE!')
     fp.write('FAILURE!')
     fp.close()
-    send_notification('Hashing failure (mutation) :(', body=f'Hashing failed')
+    send_notification('Hashing failure (local mutation) :(', body=f'Hashing failed')
 
 
 
