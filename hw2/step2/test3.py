@@ -5,6 +5,7 @@ from multiprocessing import Pool
 import math
 import time 
 from datetime import timedelta
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 
 import smtplib
 from email.message import EmailMessage
@@ -56,41 +57,46 @@ def product_size(*iterables):
 def main():
 
     ip = open('common.txt', 'r')
-    fp = open('results-mutation1.txt', 'w')
+    fp = open('results-concatenation-common.txt', 'w')
 
     passwords = ip.read().splitlines()
     ip.close()
 
-    all_candidates = [''.join(t) for t in itertools.product(passwords, repeat=2)]
+    all_candidates = (''.join(t) for t in itertools.product(passwords, repeat=2))
 
     count = 0
     total = product_size(passwords, passwords)
 
     start = time.perf_counter()
-    last_print = start
-    print_interval = 5  # seconds between progress prints
 
-    with Pool(processes=12) as pool:
-        for result in pool.imap_unordered(check_candidate, all_candidates, chunksize=2048):
-            #print(result)
-            count += 1
-            now = time.perf_counter()
-            if now - last_print >= print_interval:
-                elapsed = now - start
-                rate = count / elapsed                      # candidates per second
-                remaining = total - count
-                eta_seconds = remaining / rate
-                print(f"{count}/{total} ({100*count/total:.2f}%) "f"- {rate:.1f}/s - ETA {timedelta(seconds=int(eta_seconds))}")
-                last_print = now
+    max_workers = 12
 
-            if result is not None:
-                print(f"SUCCESS!  Password is: {result}")
-                fp.write(f"SUCCESS!  Password is: {result}")
-                fp.close()
-                pool.terminate()
-                send_notification('Hashing Success (concatenation common)!', body=f'Found password: {result}')
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(check_candidate, c) for c in itertools.islice(all_candidates, max_workers)}
 
-                exit(0)
+        while futures:
+            done, futures = wait(futures, return_when=FIRST_COMPLETED)
+
+            for future in done:
+                result = future.result()
+                count += 1
+                if (count % 10000 == 0):
+                    elapsed = time.perf_counter() - start
+                    rate = count / elapsed                      # candidates per second
+                    remaining = total - count
+                    eta_seconds = remaining / rate
+                    print(f"{count}/{total} ({100*count/total:.2f}%) "f"- {rate:.1f}/s - ETA {timedelta(seconds=int(eta_seconds))}")
+
+                if result is not None:
+                    print(f"SUCCESS!  Password is: {result}")
+                    fp.write(f"SUCCESS!  Password is: {result}")
+                    fp.close()
+                    send_notification('Hashing Success (concatenation common)!', body=f'Found password: {result}')
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    exit(0)
+
+            for c in itertools.islice(all_candidates, len(done)):
+                futures.add(executor.submit(check_candidate, c))
 
     print('FAILURE!')
     fp.write('FAILURE!')
