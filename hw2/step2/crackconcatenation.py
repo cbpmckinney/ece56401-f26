@@ -56,22 +56,27 @@ def product_size(*iterables):
 def main():
 
     ip = open('common.txt', 'r')
-    fp = open('results-mutation1.txt', 'w')
+    ap = open('all.txt', 'r')
+    fp = open('results-concat.txt', 'w')
 
-    passwords = ip.read().splitlines()
+    common = ip.read().splitlines()
+    all = ap.read().splitlines()
+    ap.close()
     ip.close()
 
-    all_candidates = [''.join(t) for t in itertools.product(passwords, repeat=2)]
+    cross1 = [''.join(t) for t in itertools.product(common, all)]
+    cross2 = [''.join(t) for t in itertools.product(all, common)]
+    all_candidates = itertools.chain(cross1, cross2)
 
     count = 0
-    total = product_size(passwords, passwords)
+    total = 2*product_size(all, common)
 
     start = time.perf_counter()
     last_print = start
     print_interval = 5  # seconds between progress prints
 
-    with Pool(processes=12) as pool:
-        for result in pool.imap_unordered(check_candidate, all_candidates, chunksize=2048):
+    with Pool(processes=8) as pool:
+        for result in pool.imap_unordered(check_candidate, all_candidates, chunksize=256):
             #print(result)
             count += 1
             now = time.perf_counter()
@@ -88,14 +93,14 @@ def main():
                 fp.write(f"SUCCESS!  Password is: {result}")
                 fp.close()
                 pool.terminate()
-                send_notification('Hashing Success (concatenation common)!', body=f'Found password: {result}')
+                send_notification('Hashing Success (concatenation mixed)!', body=f'Found password: {result}')
 
                 exit(0)
 
     print('FAILURE!')
     fp.write('FAILURE!')
     fp.close()
-    send_notification('Hashing failure (concatenation common) :(', body=f'Hashing failed')
+    send_notification('Hashing failure (concatenation mixed) :(', body=f'Hashing failed')
 
 
 
