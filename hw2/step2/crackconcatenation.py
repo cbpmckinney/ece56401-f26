@@ -64,19 +64,19 @@ def main():
     ap.close()
     ip.close()
 
-    cross1 = (''.join(t) for t in itertools.product(common, all))
-    cross2 = (''.join(t) for t in itertools.product(all, common))
-    all_candidates = itertools.chain(cross1, cross2)
+    cross1 = (''.join(t) for t in itertools.product(common, common))
+    #cross2 = (''.join(t) for t in itertools.product(all, common))
+    all_candidates = itertools.chain(cross1)
 
     count = 0
-    total = 2*product_size(all, common)
+    total = 1*product_size(common, common)
 
     start = time.perf_counter()
     last_print = start
     print_interval = 5  # seconds between progress prints
 
     with Pool(processes=8) as pool:
-        for result in pool.imap_unordered(check_candidate, all_candidates, chunksize=256):
+        for result in pool.imap_unordered(check_candidate, all_candidates, chunksize=128):
             #print(result)
             count += 1
             now = time.perf_counter()
