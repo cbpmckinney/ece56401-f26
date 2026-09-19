@@ -32,14 +32,14 @@ def send_notification(subject, body):
 
 def check_candidate(candidate: str):
 
-    #targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$Q/nOKF5ECoPwQIJAZSlNcRt21Y3b1eV42Usj5SkfBX9'
+    targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$Q/nOKF5ECoPwQIJAZSlNcRt21Y3b1eV42Usj5SkfBX9'
 
     #computer1 test: computer is in the dictionary, adding 1
     #hash for computer1 using the given salt is
     # $y$j9T$F/vLDJRdzzspQonYxyqKl1$vSd5IS8bJ9suGIKokVZA2c1gWG.GEJhe.m/CQSwkAq9
     #targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$vSd5IS8bJ9suGIKokVZA2c1gWG.GEJhe.m/CQSwkAq9'
     #computer12 hash
-    targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$w3qEw/I.yfXHwGeD9fdfSG21XPdY13B714Nu0YiCRu6'
+    #targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$w3qEw/I.yfXHwGeD9fdfSG21XPdY13B714Nu0YiCRu6'
 
 
     result = crypt.crypt(candidate, targethash)
@@ -62,7 +62,7 @@ def main():
     alphabet = string.digits + '!@#$%^&*()-_+='
 
     ip = open('common.txt', 'r')
-    fp = open('results-mutation1.txt', 'w')
+    fp = open('results-mutations1to4.txt', 'w')
 
     passwords = ip.read().splitlines()
     #print(passwords)
@@ -74,23 +74,23 @@ def main():
     mutations1 = [''.join(t) for t in itertools.product(alphabet, repeat=1)]
     mutations2 = [''.join(t) for t in itertools.product(alphabet, repeat=2)]
     mutations3 = [''.join(t) for t in itertools.product(alphabet, repeat=3)]
-    mutations4 = [''.join(t) for t in itertools.product(alphabet, repeat=2)]
+    #mutations4 = [''.join(t) for t in itertools.product(alphabet, repeat=4)]
     
     #prepended = (s + password for password, s in itertools.product(passwords, mutations))
     appended1 = (password + s for password, s in itertools.product(passwords, mutations1))
     appended2 = (password + s for password, s in itertools.product(passwords, mutations2))
     appended3 = (password + s for password, s in itertools.product(passwords, mutations3))
-    appended4 = (password + s for password, s in itertools.product(passwords, mutations4))
+    #appended4 = (password + s for password, s in itertools.product(passwords, mutations4))
 
 
     #all_candidates =  itertools.chain(appended, prepended)
-    all_candidates = itertools.chain(appended1, appended2, appended3, appended4)
+    all_candidates = itertools.chain(appended1, appended2, appended3)
     #for word in all_candidates:
     #    print(word, end='')
 
     
     count = 0
-    total = product_size(passwords, mutations1) + product_size(passwords, mutations2) + product_size(passwords, mutations3) + product_size(passwords, mutations4)
+    total = product_size(passwords, mutations1) + product_size(passwords, mutations2) + product_size(passwords, mutations3)
 
     start = time.perf_counter()
     last_print = start
