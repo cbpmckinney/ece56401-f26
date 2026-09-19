@@ -5,6 +5,9 @@ from multiprocessing import Pool
 import math
 import time 
 from datetime import timedelta
+from lengthbuckets import iter_length_buckets, count_length_buckets
+
+
 
 import smtplib
 from email.message import EmailMessage
@@ -56,26 +59,23 @@ def product_size(*iterables):
 def main():
 
     ip = open('dictionaries/common.txt', 'r')
-    ap = open('dictionaries/all.txt', 'r')
-    fp = open('results-concat.txt', 'w')
-
     common = ip.read().splitlines()
-    all = ap.read().splitlines()
-    ap.close()
     ip.close()
 
-    cross1 = (''.join(t) for t in itertools.product(common, common))
-    #cross2 = (''.join(t) for t in itertools.product(all, common))
-    all_candidates = itertools.chain(cross1)
+    candidates = iter_length_buckets(min_len=3, max_len=4)       # generator, lazy — no eager list
+    
+    cross1 = (''.join(t) for t in itertools.product(common, candidates))
+    cross2 = (''.join(t) for t in itertools.product(candidates, common))
+    all_candidates = itertools.chain(cross1, cross2)
 
     count = 0
-    total = 1*product_size(common, common)
+    total = 2*product_size(common, candidates)
 
     start = time.perf_counter()
     last_print = start
     print_interval = 5  # seconds between progress prints
 
-    with Pool(processes=8) as pool:
+    with Pool(processes=12) as pool:
         for result in pool.imap_unordered(check_candidate, all_candidates, chunksize=128):
             #print(result)
             count += 1
@@ -90,16 +90,16 @@ def main():
 
             if result is not None:
                 print(f"SUCCESS!  Password is: {result}")
-                fp.write(f"SUCCESS!  Password is: {result}")
-                fp.close()
+                #fp.write(f"SUCCESS!  Password is: {result}")
+                #fp.close()
                 pool.terminate()
                 send_notification('Hashing Success (concatenation mixed)!', body=f'Found password: {result}')
 
                 exit(0)
 
     print('FAILURE!')
-    fp.write('FAILURE!')
-    fp.close()
+    #fp.write('FAILURE!')
+    #fp.close()
     send_notification('Hashing failure (concatenation mixed) :(', body=f'Hashing failed')
 
 

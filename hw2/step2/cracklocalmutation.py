@@ -84,7 +84,7 @@ def leet_variant_count(word):
 
 
 def main():
-    ip = open('all.txt', 'r')
+    ip = open('dictionaries/all.txt', 'r')
     fp = open('results-localmutation.txt', 'w')
 
     passwords = ip.read().splitlines()

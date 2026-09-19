@@ -61,7 +61,7 @@ def main():
     #alphabet = string.digits + string.punctuation
     alphabet = string.digits + '!@#$%^&*()-_+='
 
-    ip = open('common.txt', 'r')
+    ip = open('dictionaries/common.txt', 'r')
     fp = open('results-mutations1to4.txt', 'w')
 
     passwords = ip.read().splitlines()
