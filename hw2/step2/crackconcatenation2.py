@@ -63,13 +63,14 @@ def main():
     ip.close()
 
     candidates = iter_length_buckets(min_len=3, max_len=4)       # generator, lazy — no eager list
-    
+    totalcandidates = count_length_buckets(min_len=3, max_len=4)
+
     cross1 = (''.join(t) for t in itertools.product(common, candidates))
     cross2 = (''.join(t) for t in itertools.product(candidates, common))
     all_candidates = itertools.chain(cross1, cross2)
 
     count = 0
-    total = 2*product_size(common, candidates)
+    total = 2*len(common)*totalcandidates
 
     start = time.perf_counter()
     last_print = start
