@@ -32,12 +32,14 @@ def send_notification(subject, body):
 
 def check_candidate(candidate: str):
 
-    targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$Q/nOKF5ECoPwQIJAZSlNcRt21Y3b1eV42Usj5SkfBX9'
+    #targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$Q/nOKF5ECoPwQIJAZSlNcRt21Y3b1eV42Usj5SkfBX9'
 
     #computer1 test: computer is in the dictionary, adding 1
     #hash for computer1 using the given salt is
     # $y$j9T$F/vLDJRdzzspQonYxyqKl1$vSd5IS8bJ9suGIKokVZA2c1gWG.GEJhe.m/CQSwkAq9
     #targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$vSd5IS8bJ9suGIKokVZA2c1gWG.GEJhe.m/CQSwkAq9'
+    #computer12 hash
+    targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$w3qEw/I.yfXHwGeD9fdfSG21XPdY13B714Nu0YiCRu6'
 
 
     result = crypt.crypt(candidate, targethash)
@@ -57,7 +59,7 @@ def main():
     
     #alphabet = string.ascii_letters + string.digits + string.punctuation
     #alphabet = string.digits + string.punctuation
-    alphabet = string.digits + '!@#$%^&*()'
+    alphabet = string.digits + '!@#$%^&*()-_+='
 
     ip = open('common.txt', 'r')
     fp = open('results-mutation1.txt', 'w')
@@ -94,8 +96,8 @@ def main():
     last_print = start
     print_interval = 5  # seconds between progress prints
 
-    with Pool(processes=12) as pool:
-        for result in pool.imap_unordered(check_candidate, all_candidates, chunksize=64):
+    with Pool(processes=32) as pool:
+        for result in pool.imap_unordered(check_candidate, all_candidates, chunksize=128):
             #print(result)
             count += 1
             now = time.perf_counter()
@@ -113,6 +115,10 @@ def main():
                 fp.close()
                 pool.terminate()
                 send_notification('Hashing Success (mutation)!', body=f'Found password: {result}')
+                print(f'Started at: {start}')
+                print(f'Ended at: {time.perf_counter()}')
+                print(f'Time used: {time.perf_counter()-start}')
+
 
                 exit(0)
 
