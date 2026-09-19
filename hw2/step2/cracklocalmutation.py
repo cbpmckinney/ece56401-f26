@@ -104,7 +104,7 @@ def main():
     fullcasecount = sum(case_variant_count(password) for password in passwords)
     leetcount = sum(leet_variant_count(password) for password in passwords)
     
-    total = 3*len(passwords)# + leetcount + fullcasecount
+    total = 4*len(passwords)# + leetcount + fullcasecount
 
 
     start = time.perf_counter()
