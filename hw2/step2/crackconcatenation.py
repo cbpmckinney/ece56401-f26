@@ -64,8 +64,8 @@ def main():
     ap.close()
     ip.close()
 
-    cross1 = [''.join(t) for t in itertools.product(common, all)]
-    cross2 = [''.join(t) for t in itertools.product(all, common)]
+    cross1 = (''.join(t) for t in itertools.product(common, all))
+    cross2 = (''.join(t) for t in itertools.product(all, common))
     all_candidates = itertools.chain(cross1, cross2)
 
     count = 0
