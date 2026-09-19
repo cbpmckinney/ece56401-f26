@@ -58,9 +58,9 @@ def main():
     fp = open('results-random.txt', 'w')
     
     alphabet = string.ascii_letters + string.digits + string.punctuation
-    repeat2 = [''.join(t) for t in itertools.product(alphabet, repeat = 2)]
-    repeat3 = [''.join(t) for t in itertools.product(alphabet, repeat = 3)]
-    repeat4 = [''.join(t) for t in itertools.product(alphabet, repeat = 4)]
+    repeat2 = (''.join(t) for t in itertools.product(alphabet, repeat = 2))
+    repeat3 = (''.join(t) for t in itertools.product(alphabet, repeat = 3))
+    repeat4 = (''.join(t) for t in itertools.product(alphabet, repeat = 4))
 
     all_candidates = itertools.chain(repeat2, repeat3, repeat4)
                 
