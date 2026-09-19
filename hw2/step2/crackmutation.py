@@ -56,7 +56,8 @@ def product_size(*iterables):
 def main():
     
     #alphabet = string.ascii_letters + string.digits + string.punctuation
-    alphabet = string.digits + string.punctuation
+    #alphabet = string.digits + string.punctuation
+    alphabet = string.digits + '!@#$%^&*()'
 
     ip = open('common.txt', 'r')
     fp = open('results-mutation1.txt', 'w')
@@ -68,31 +69,43 @@ def main():
 
     #mutations = [''.join(t) for n in (1, 2) for t in itertools.product(alphabet, repeat=n)]
     # Change to only n=1 for tractability.  Otherwise it'll take 100 days!
-    mutations = [''.join(t) for t in itertools.product(alphabet, repeat=2)]
+    mutations1 = [''.join(t) for t in itertools.product(alphabet, repeat=1)]
+    mutations2 = [''.join(t) for t in itertools.product(alphabet, repeat=2)]
+    mutations3 = [''.join(t) for t in itertools.product(alphabet, repeat=3)]
+    mutations4 = [''.join(t) for t in itertools.product(alphabet, repeat=2)]
+    
     #prepended = (s + password for password, s in itertools.product(passwords, mutations))
-    appended = (password + s for password, s in itertools.product(passwords, mutations))
+    appended1 = (password + s for password, s in itertools.product(passwords, mutations1))
+    appended2 = (password + s for password, s in itertools.product(passwords, mutations2))
+    appended3 = (password + s for password, s in itertools.product(passwords, mutations3))
+    appended4 = (password + s for password, s in itertools.product(passwords, mutations4))
+
 
     #all_candidates =  itertools.chain(appended, prepended)
-    all_candidates = appended
+    all_candidates = itertools.chain(appended1, appended2, appended3, appended4)
     #for word in all_candidates:
     #    print(word, end='')
 
     
     count = 0
-    total = 1*product_size(passwords, mutations)
+    total = product_size(passwords, mutations1) + product_size(passwords, mutations2) + product_size(passwords, mutations3) + product_size(passwords, mutations4)
 
     start = time.perf_counter()
+    last_print = start
+    print_interval = 5  # seconds between progress prints
 
     with Pool(processes=12) as pool:
-        for result in pool.imap_unordered(check_candidate, all_candidates, chunksize=1):
+        for result in pool.imap_unordered(check_candidate, all_candidates, chunksize=64):
             #print(result)
             count += 1
-            if (count % 10000 == 0):
-                elapsed = time.perf_counter() - start
+            now = time.perf_counter()
+            if now - last_print >= print_interval:
+                elapsed = now - start
                 rate = count / elapsed                      # candidates per second
                 remaining = total - count
                 eta_seconds = remaining / rate
                 print(f"{count}/{total} ({100*count/total:.2f}%) "f"- {rate:.1f}/s - ETA {timedelta(seconds=int(eta_seconds))}")
+                last_print = now
 
             if result is not None:
                 print(f"SUCCESS!  Password is: {result}")

@@ -67,19 +67,24 @@ def main():
     
     count = 0
     total = (len(alphabet))**2 + (len(alphabet))**3 + (len(alphabet))**4
+    
 
     start = time.perf_counter()
+    last_print = start
+    print_interval = 5  # seconds between progress prints
 
-    with Pool(processes=12) as pool:
-        for result in pool.imap_unordered(check_candidate, all_candidates, chunksize=1):
+    with Pool(processes=6) as pool:
+        for result in pool.imap_unordered(check_candidate, all_candidates, chunksize=256):
             #print(result)
             count += 1
-            if (count % 10000 == 0):
-                elapsed = time.perf_counter() - start
+            now = time.perf_counter()
+            if now - last_print >= print_interval:
+                elapsed = now - start
                 rate = count / elapsed                      # candidates per second
                 remaining = total - count
                 eta_seconds = remaining / rate
                 print(f"{count}/{total} ({100*count/total:.2f}%) "f"- {rate:.1f}/s - ETA {timedelta(seconds=int(eta_seconds))}")
+                last_print = now
 
             if result is not None:
                 print(f"SUCCESS!  Password is: {result}")
