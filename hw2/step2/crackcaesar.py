@@ -12,8 +12,28 @@ import json
 import os
 
 targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$Q/nOKF5ECoPwQIJAZSlNcRt21Y3b1eV42Usj5SkfBX9'
+#targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$1iAvzyCgCA7PxGXOIHnaKKuL1HcaFs.IGrFpDdsLWbD'
+
 scriptname = os.path.basename(__file__)
-jobdescription = "Prepend and append 2026 to all"
+jobdescription = "Caesar cipher for uncommon words"
+
+def caesar(password: str, shamt: int) -> str:
+    ans = ''
+    for i in range(len(password)):
+        curchar = password[i]
+        if curchar.isalpha():
+            if curchar.islower:
+                ans += chr((ord(curchar) - 0x61 + shamt) % 26 + 0x61)
+            else:
+                ans += chr((ord(curchar) - 0x41 + shamt) % 26 + 0x41)
+
+        else:
+            ans += curchar
+
+    return ans
+
+
+
 
 
 def send_notification(subject, body):
@@ -53,42 +73,14 @@ def log_job(record):
 
 def main():
 
-   
-
-    ip = open('dictionaries/common.txt', 'r')
-    common = ip.read().splitlines()
+    ip = open('dictionaries/uncommon.txt', 'r')
+    uncommon = ip.read().splitlines()
     ip.close()
 
-    ip = open('dictionaries/all.txt', 'r')
-    all = ip.read().splitlines()
-    ip.close()
-
-
-    digits = '0123456789'
-    #punct = string.punctuation
-    year = '2026'
-
-    digits1 = list(''.join(t) for t in itertools.product(digits, repeat = 1))
-    digits2 = list(''.join(t) for t in itertools.product(digits, repeat = 2))
-    digits3 = list(''.join(t) for t in itertools.product(digits, repeat = 3))
-    digits4 = list(''.join(t) for t in itertools.product(digits, repeat = 4))
-
-    cross1a = (''.join(t) for t in itertools.product(digits1, common))
-    cross1b = (''.join(t) for t in itertools.product(common, digits1))
-    cross2a = (''.join(t) for t in itertools.product(digits2, common))
-    cross2b = (''.join(t) for t in itertools.product(common, digits2))
-    cross3a = (''.join(t) for t in itertools.product(digits3, common))
-    cross3b = (''.join(t) for t in itertools.product(common, digits3))
-    cross4a = (''.join(t) for t in itertools.product(digits4, common))
-    cross4b = (''.join(t) for t in itertools.product(common, digits4))
-
-    yeara = (''.join(t) for t in itertools.product(all, [year]))
-    yearb = (''.join(t) for t in itertools.product([year], all))
-
-    all_candidates = itertools.chain(yeara, yearb)
+    all_candidates = (caesar(p, i) for p in uncommon for i in range(1,26))
 
     count = 0
-    total = 2*len(all)
+    total = 25*len(uncommon)
 
 
     start = time.perf_counter()

@@ -12,8 +12,12 @@ import json
 import os
 
 targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$Q/nOKF5ECoPwQIJAZSlNcRt21Y3b1eV42Usj5SkfBX9'
+
 scriptname = os.path.basename(__file__)
-jobdescription = "Prepend and append 2026 to all"
+jobdescription = "Reverse for all words"
+
+
+
 
 
 def send_notification(subject, body):
@@ -53,42 +57,14 @@ def log_job(record):
 
 def main():
 
-   
-
-    ip = open('dictionaries/common.txt', 'r')
-    common = ip.read().splitlines()
-    ip.close()
-
     ip = open('dictionaries/all.txt', 'r')
     all = ip.read().splitlines()
     ip.close()
 
-
-    digits = '0123456789'
-    #punct = string.punctuation
-    year = '2026'
-
-    digits1 = list(''.join(t) for t in itertools.product(digits, repeat = 1))
-    digits2 = list(''.join(t) for t in itertools.product(digits, repeat = 2))
-    digits3 = list(''.join(t) for t in itertools.product(digits, repeat = 3))
-    digits4 = list(''.join(t) for t in itertools.product(digits, repeat = 4))
-
-    cross1a = (''.join(t) for t in itertools.product(digits1, common))
-    cross1b = (''.join(t) for t in itertools.product(common, digits1))
-    cross2a = (''.join(t) for t in itertools.product(digits2, common))
-    cross2b = (''.join(t) for t in itertools.product(common, digits2))
-    cross3a = (''.join(t) for t in itertools.product(digits3, common))
-    cross3b = (''.join(t) for t in itertools.product(common, digits3))
-    cross4a = (''.join(t) for t in itertools.product(digits4, common))
-    cross4b = (''.join(t) for t in itertools.product(common, digits4))
-
-    yeara = (''.join(t) for t in itertools.product(all, [year]))
-    yearb = (''.join(t) for t in itertools.product([year], all))
-
-    all_candidates = itertools.chain(yeara, yearb)
+    all_candidates = (password[::-1] for password in all) 
 
     count = 0
-    total = 2*len(all)
+    total = len(all)
 
 
     start = time.perf_counter()

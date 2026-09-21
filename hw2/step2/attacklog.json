@@ -1,0 +1,3 @@
+{"script": "crackappendprepend.py", "description": "Prepend and append 1-3 digits to common", "count": 6842490, "result": "Failure"}
+{"script": "crackcaesar.py", "description": "Caesar cipher for common words", "count": 70300, "result": "Failure"}
+{"script": "crackappendprepend.py", "description": "Prepend and append 2026 to all", "count": 599850, "result": "Failure"}
