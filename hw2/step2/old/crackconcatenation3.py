@@ -5,7 +5,7 @@ from multiprocessing import Pool
 import math
 import time 
 from datetime import timedelta
-from lengthbuckets import iter_length_buckets, count_length_buckets
+from hw2.step2.old.lengthbuckets import iter_length_buckets, count_length_buckets
 
 
 
