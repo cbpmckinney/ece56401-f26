@@ -9,8 +9,11 @@ from lengthbuckets import iter_length_buckets, count_length_buckets
 import smtplib
 from email.message import EmailMessage
 import json
+import os
 
 targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$Q/nOKF5ECoPwQIJAZSlNcRt21Y3b1eV42Usj5SkfBX9'
+scriptname = os.path.basename(__file__)
+jobdescription = "Prepend and append 1-3 digits to common + 2026 to all"
 
 
 def send_notification(subject, body):
@@ -49,6 +52,8 @@ def log_job(record):
 
 
 def main():
+
+   
 
     ip = open('dictionaries/common.txt', 'r')
     common = ip.read().splitlines()
@@ -109,14 +114,14 @@ def main():
                 #fp.close()
                 pool.terminate()
                 
-                record = {"script": "crackappendprepend.py", "description": "Prepend and append 1-4 digits to common", "count": total, "result": f'Success: password is {result}'}
+                record = {"script": scriptname, "description": jobdescription, "count": total, "result": f'Success: password is {result}'}
                 body = json.dumps(record, indent=2)
                 send_notification('Hashing Success!', body)
                 log_job(record)
                 exit(0)
 
     print('FAILURE!')
-    record = {"script": "crackappendprepend.py", "description": "Prepend and append 1-3 digits to common + 2026 to all", "count": total, "result": f'Failure'}
+    record = {"script": scriptname, "description": jobdescription, "count": total, "result": f'Failure'}
     log_job(record)
     body = json.dumps(record, indent=2)
     send_notification('Hashing Failure!', body)
