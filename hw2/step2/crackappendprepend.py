@@ -116,7 +116,7 @@ def main():
                 exit(0)
 
     print('FAILURE!')
-    record = {"script": "crackappendprepend.py", "description": "Prepend and append 1-3 digits to common + 2026 to all", "count": total, "result": f'Success: password is {result}'}
+    record = {"script": "crackappendprepend.py", "description": "Prepend and append 1-3 digits to common + 2026 to all", "count": total, "result": f'Failure'}
     log_job(record)
     body = json.dumps(record, indent=2)
     send_notification('Hashing Failure!', body)
