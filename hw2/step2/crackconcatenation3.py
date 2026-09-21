@@ -5,22 +5,12 @@ from multiprocessing import Pool
 import math
 import time 
 from datetime import timedelta
+from lengthbuckets import iter_length_buckets, count_length_buckets
+
+
 
 import smtplib
 from email.message import EmailMessage
-
-
-targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$Q/nOKF5ECoPwQIJAZSlNcRt21Y3b1eV42Usj5SkfBX9'
-
-    #computer1 test: computer is in the dictionary, adding 1
-    #hash for computer1 using the given salt is
-    # $y$j9T$F/vLDJRdzzspQonYxyqKl1$vSd5IS8bJ9suGIKokVZA2c1gWG.GEJhe.m/CQSwkAq9
-    #targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$vSd5IS8bJ9suGIKokVZA2c1gWG.GEJhe.m/CQSwkAq9'
-    
-    #testing: computerzmodem $y$j9T$F/vLDJRdzzspQonYxyqKl1$TVmvSa..42k.rR.2x13ZI0QuEVznUssk61UC24OEPLD
-    #testing: zmodemcomputer $y$j9T$F/vLDJRdzzspQonYxyqKl1$hO5UV9efAiqv4j1I9kj59KBmOUkiRDi1dtis1L4qKbB
-
-#targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$hO5UV9efAiqv4j1I9kj59KBmOUkiRDi1dtis1L4qKbB'
 
 
 def send_notification(subject, body):
@@ -45,6 +35,14 @@ def send_notification(subject, body):
 
 def check_candidate(candidate: str):
 
+    targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$Q/nOKF5ECoPwQIJAZSlNcRt21Y3b1eV42Usj5SkfBX9'
+
+    #computer1 test: computer is in the dictionary, adding 1
+    #hash for computer1 using the given salt is
+    # $y$j9T$F/vLDJRdzzspQonYxyqKl1$vSd5IS8bJ9suGIKokVZA2c1gWG.GEJhe.m/CQSwkAq9
+    #targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$vSd5IS8bJ9suGIKokVZA2c1gWG.GEJhe.m/CQSwkAq9'
+
+
     result = crypt.crypt(candidate, targethash)
     if result == targethash:
         return candidate
@@ -61,20 +59,32 @@ def product_size(*iterables):
 def main():
 
     ip = open('dictionaries/common.txt', 'r')
-    ap = open('dictionaries/all.txt', 'r')
-    fp = open('results-concat.txt', 'w')
-
     common = ip.read().splitlines()
-    all = ap.read().splitlines()
-    ap.close()
     ip.close()
 
-    cross1 = (''.join(t) for t in itertools.product(common, common))
-    #cross2 = (''.join(t) for t in itertools.product(all, common))
-    all_candidates = itertools.chain(cross1)
+    digits = '0123456789'
+    punct = string.punctuation
+
+    digits1 = (''.join(t) for t in itertools.product(digits, repeat=1))
+    digits2 = (''.join(t) for t in itertools.product(digits, repeat=2))
+    digits3 = (''.join(t) for t in itertools.product(digits, repeat=3))
+    digits4 = (''.join(t) for t in itertools.product(digits, repeat=4))
+
+
+    cross1a = (''.join(t) for t in itertools.product(common, digits1))
+    cross1b = (''.join(t) for t in itertools.product(digits1, common))
+    cross2a = (''.join(t) for t in itertools.product(common, digits2))
+    cross2b = (''.join(t) for t in itertools.product(digits2, common))
+    cross3a = (''.join(t) for t in itertools.product(common, digits))
+    cross3b = (''.join(t) for t in itertools.product(digits3, common))
+
+    cross4a = (''.join(t) for t in itertools.product(common, digits4))
+    cross4b = (''.join(t) for t in itertools.product(digits4, common))
+        
+    all_candidates = itertools.chain(cross3a, cross3b)
 
     count = 0
-    total = 1*product_size(common, common)
+    total = 2*len(common)*(1000)
 
     start = time.perf_counter()
     last_print = start
@@ -95,16 +105,16 @@ def main():
 
             if result is not None:
                 print(f"SUCCESS!  Password is: {result}")
-                fp.write(f"SUCCESS!  Password is: {result}")
-                fp.close()
+                #fp.write(f"SUCCESS!  Password is: {result}")
+                #fp.close()
                 pool.terminate()
                 send_notification('Hashing Success (concatenation mixed)!', body=f'Found password: {result}')
 
                 exit(0)
 
     print('FAILURE!')
-    fp.write('FAILURE!')
-    fp.close()
+    #fp.write('FAILURE!')
+    #fp.close()
     send_notification('Hashing failure (concatenation mixed) :(', body=f'Hashing failed')
 
 

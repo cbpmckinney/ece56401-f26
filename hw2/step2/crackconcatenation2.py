@@ -62,8 +62,8 @@ def main():
     common = ip.read().splitlines()
     ip.close()
 
-    candidates = iter_length_buckets(min_len=3, max_len=4)       # generator, lazy — no eager list
-    totalcandidates = count_length_buckets(min_len=3, max_len=4)
+    candidates = iter_length_buckets(min_len=5, max_len=5)       # generator, lazy — no eager list
+    totalcandidates = count_length_buckets(min_len=5, max_len=5)
 
     cross1 = (''.join(t) for t in itertools.product(common, candidates))
     cross2 = (''.join(t) for t in itertools.product(candidates, common))
