@@ -12,8 +12,12 @@ import json
 import os
 
 targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$Q/nOKF5ECoPwQIJAZSlNcRt21Y3b1eV42Usj5SkfBX9'
+
 scriptname = os.path.basename(__file__)
-jobdescription = "Prepend and append 2026 to all"
+jobdescription = "Case variations for common words"
+
+
+
 
 
 def send_notification(subject, body):
@@ -50,31 +54,28 @@ def log_job(record):
     with open('attacklog.json', 'a') as f:
         f.write(json.dumps(record) + '\n')
 
+def rotations(word):
+    n = len(word)
+    return (word[i:] + word[:i] for i in range(1, n))
+
+def case_variants(word):
+    choices = [(c.lower(), c.upper()) if c.lower() != c.upper() else (c,) for c in word]
+    return (''.join(t) for t in itertools.product(*choices))
+
+def case_variant_count(word):
+    return 2 ** sum(1 for c in word if c.lower() != c.upper())
+
 
 def main():
-
-    punct = string.punctuation
-    digits = string.digits 
 
     ip = open('dictionaries/common.txt', 'r')
     common = ip.read().splitlines()
     ip.close()
 
-    ip = open('dictionaries/all.txt', 'r')
-    all = ip.read().splitlines()
-    ip.close()
-
-    cross1a = (''.join(t) for t in itertools.product(common, digits, punct))
-    cross1b = (''.join(t) for t in itertools.product(common, punct, digits))
-    cross2a = (''.join(t) for t in itertools.product(digits, punct, common))
-    cross2b = (''.join(t) for t in itertools.product(punct, digits, common))
-    cross3a = (''.join(t) for t in itertools.product(digits, common, punct))
-    cross3b = (''.join(t) for t in itertools.product(punct, common, digits))
-
-    all_candidates = itertools.chain(cross1a, cross1b, cross2a, cross2b, cross3a, cross3b)
+    all_candidates = (v for word in common for v in case_variants(word))
+    total = sum(case_variant_count(word) for word in common)
 
     count = 0
-    total = 6*len(common)*len(punct)*len(digits)
 
 
     start = time.perf_counter()
