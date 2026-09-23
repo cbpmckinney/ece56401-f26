@@ -12,8 +12,12 @@ import json
 import os
 
 targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$Q/nOKF5ECoPwQIJAZSlNcRt21Y3b1eV42Usj5SkfBX9'
+
 scriptname = os.path.basename(__file__)
-jobdescription = "Append and prepend Bob's old password to all"
+jobdescription = "GOT words"
+
+
+
 
 
 def send_notification(subject, body):
@@ -50,28 +54,33 @@ def log_job(record):
     with open('attacklog.json', 'a') as f:
         f.write(json.dumps(record) + '\n')
 
+def rotations(word):
+    n = len(word)
+    return (word[i:] + word[:i] for i in range(1, n))
+
+def case_variants(word):
+    choices = [(c.lower(), c.upper()) if c.lower() != c.upper() else (c,) for c in word]
+    return (''.join(t) for t in itertools.product(*choices))
+
+def case_variant_count(word):
+    return 2 ** sum(1 for c in word if c.lower() != c.upper())
+
 
 def main():
 
-    punct = string.punctuation
-    digits = string.digits 
-
-    ip = open('dictionaries/common.txt', 'r')
-    common = ip.read().splitlines()
+    ip = open('dictionaries/GOT.txt', 'r')
+    GOT = ip.read().splitlines()
     ip.close()
 
-    ip = open('dictionaries/all.txt', 'r')
-    all = ip.read().splitlines()
-    ip.close()
 
-    oldbob = ['bwAEBIMs']
+    lowers = (password.lower() for password in GOT)
+    uppers = (password.upper() for password in GOT)
+    casevariants  = (v for word in GOT for v in case_variants(word))
 
-    cross1a = (''.join(t) for t in itertools.product(all, oldbob))
-    cross1b = (''.join(t) for t in itertools.product(oldbob, all))
+    all_candidates = itertools.chain(lowers, uppers, casevariants)
+    total = 2*len(GOT) + sum(case_variant_count(password) for password in GOT)
 
-    all_candidates = itertools.chain(cross1a, cross1b)
     count = 0
-    total = 2*len(all)
 
 
     start = time.perf_counter()
