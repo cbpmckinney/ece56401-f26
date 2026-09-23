@@ -4,3 +4,6 @@
 {"script": "crackcaesar.py", "description": "Caesar cipher for uncommon words", "count": 7427825, "result": "Failure"}
 {"script": "crackrotation.py", "description": "Rotations for all words", "count": 2492412, "result": "Failure"}
 {"script": "crackcases.py", "description": "Case variations for common words", "count": 284382, "result": "Failure"}
+{"script": "crackleetspeak.py", "description": "Leet substitutions for common words", "count": 226957, "result": "Failure"}
+{"script": "crackallcaps.py", "description": "Case variations for common words", "count": 299925, "result": "Failure"}
+{"script": "crackallcaps.py", "description": "Lower case for common words", "count": 299925, "result": "Failure"}
