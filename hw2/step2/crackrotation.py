@@ -14,7 +14,7 @@ import os
 targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$Q/nOKF5ECoPwQIJAZSlNcRt21Y3b1eV42Usj5SkfBX9'
 
 scriptname = os.path.basename(__file__)
-jobdescription = "Rotations for all words"
+jobdescription = "Rotations for GOT words"
 
 
 
@@ -60,7 +60,7 @@ def rotations(word):
 
 def main():
 
-    ip = open('dictionaries/all.txt', 'r')
+    ip = open('dictionaries/GOT.txt', 'r')
     all = ip.read().splitlines()
     ip.close()
 

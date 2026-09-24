@@ -88,7 +88,7 @@ def leet_variant_count(word):
 
 def main():
 
-    ip = open('dictionaries/sorted.txt', 'r')
+    ip = open('dictionaries/GOT.txt', 'r')
     sorted = ip.read().splitlines()
     ip.close()
 

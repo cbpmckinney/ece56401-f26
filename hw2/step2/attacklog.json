@@ -7,3 +7,8 @@
 {"script": "crackleetspeak.py", "description": "Leet substitutions for common words", "count": 226957, "result": "Failure"}
 {"script": "crackallcaps.py", "description": "Case variations for common words", "count": 299925, "result": "Failure"}
 {"script": "crackallcaps.py", "description": "Lower case for common words", "count": 299925, "result": "Failure"}
+{"script": "crackappendprepend.py", "description": "Append and prepend Bob's old password to all", "count": 599850, "result": "Failure"}
+{"script": "crackgot.py", "description": "GOT words", "count": 207018, "result": "Failure"}
+{"script": "crackleetspeak.py", "description": "Leet substitutions for all words, in order of length", "count": 54665, "result": "Failure"}
+{"script": "crackreverse.py", "description": "Reverse for GOT words", "count": 209, "result": "Failure"}
+{"script": "crackrotation.py", "description": "Rotations for GOT words", "count": 1291, "result": "Failure"}

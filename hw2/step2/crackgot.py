@@ -73,9 +73,10 @@ def main():
     ip.close()
 
 
-    lowers = (password.lower() for password in GOT)
-    uppers = (password.upper() for password in GOT)
-    casevariants  = (v for word in GOT for v in case_variants(word))
+    #lowers = (password.lower() for password in GOT)
+    #uppers = (password.upper() for password in GOT)
+    #casevariants  = (v for word in GOT for v in case_variants(word))
+    
 
     all_candidates = itertools.chain(lowers, uppers, casevariants)
     total = 2*len(GOT) + sum(case_variant_count(password) for password in GOT)

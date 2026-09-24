@@ -1,3 +1,5 @@
+from encrypt import decrypt
+
 import itertools
 import string
 import legacycrypt as crypt
@@ -5,23 +7,20 @@ from multiprocessing import Pool
 import math
 import time 
 from datetime import timedelta
-from lengthbuckets import iter_length_buckets, count_length_buckets
 import smtplib
 from email.message import EmailMessage
 import json
 import os
 
-targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$Q/nOKF5ECoPwQIJAZSlNcRt21Y3b1eV42Usj5SkfBX9'
-
 scriptname = os.path.basename(__file__)
-jobdescription = "Reverse for GOT words"
+jobdescription = "Stuffing Test"
 
 
-
-
+with open("secret.html.crypt", "rb") as fp:
+    ciphertext = fp.read()
 
 def send_notification(subject, body):
-    keyfile = open('google.key')
+    keyfile = open('../step2/google.key')
     keyfiledata = keyfile.read().splitlines()
     keyaddr = keyfiledata[0]
     keypass = keyfiledata[1]
@@ -38,33 +37,25 @@ def send_notification(subject, body):
 
 def check_candidate(candidate: str):
 
-    result = crypt.crypt(candidate, targethash)
-    if result == targethash:
-        return candidate
-    else:
+    try:
+        result = decrypt(candidate, ciphertext=ciphertext)
+    except:
         return None
-
-# password hash method is yescrypt
-
-def product_size(*iterables):
-    return math.prod(len(it) for it in iterables)
-
+    return result
 
 def log_job(record):
-    with open('attacklog.json', 'a') as f:
+    with open('stuffinglog.json', 'a') as f:
         f.write(json.dumps(record) + '\n')
-
 
 def main():
 
-    ip = open('dictionaries/GOT.txt', 'r')
+    ip = open('../step2/dictionaries/all.txt', 'r')
     all = ip.read().splitlines()
     ip.close()
 
-    all_candidates = (password[::-1] for password in all) 
-
-    count = 0
+    all_candidates = (''.join(t) for t in all)
     total = len(all)
+    count = 0
 
 
     start = time.perf_counter()
@@ -92,7 +83,7 @@ def main():
                 
                 record = {"script": scriptname, "description": jobdescription, "count": total, "result": f'Success: password is {result}'}
                 body = json.dumps(record, indent=2)
-                send_notification('Hashing Success!', body)
+                send_notification('Stuffing Success!', body)
                 log_job(record)
                 exit(0)
 
@@ -100,7 +91,7 @@ def main():
     record = {"script": scriptname, "description": jobdescription, "count": total, "result": f'Failure'}
     log_job(record)
     body = json.dumps(record, indent=2)
-    send_notification('Hashing Failure!', body)
+    send_notification('Stuffing Failure!', body)
 
 
 
