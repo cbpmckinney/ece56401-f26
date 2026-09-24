@@ -36,7 +36,6 @@ def send_notification(subject, body):
         smtp.send_message(msg)
 
 def check_candidate(candidate: str):
-
     try:
         result = decrypt(candidate, ciphertext=ciphertext)
     except:
@@ -83,7 +82,7 @@ def main():
                 
                 record = {"script": scriptname, "description": jobdescription, "count": total, "result": f'Success: password is {result}'}
                 body = json.dumps(record, indent=2)
-                send_notification('Stuffing Success!', body)
+                #send_notification('Stuffing Success!', body)
                 log_job(record)
                 exit(0)
 
@@ -91,7 +90,7 @@ def main():
     record = {"script": scriptname, "description": jobdescription, "count": total, "result": f'Failure'}
     log_job(record)
     body = json.dumps(record, indent=2)
-    send_notification('Stuffing Failure!', body)
+    #send_notification('Stuffing Failure!', body)
 
 
 
