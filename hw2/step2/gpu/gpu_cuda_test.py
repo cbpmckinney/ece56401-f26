@@ -246,14 +246,66 @@ def run_sha256crypt_gpu(candidates_list, salt_str):
 
     return final_hashes
 
+import itertools
+from collections import deque
+
+def chunked_iterable(iterable, size):
+    """
+    Slices a continuous itertools generator into manageable 
+    memory-safe chunks without loading the entire stream into RAM.
+    """
+    it = iter(iterable)
+    while True:
+        # Pull a fixed slice from the generator
+        chunk = list(itertools.islice(it, size))
+        if not chunk:
+            break
+        yield chunk
+
+def process_combinations_on_gpu(charset, length, salt_str, batch_size=500000):
+    """
+    Generates brute-force combinations and streams them to the GPU.
+    """
+    # 1. Create the itertools generator (costs virtually 0 memory)
+    # Example: Product combinations ('a','b','c') -> ('a','a'), ('a','b')...
+    combos_generator = itertools.product(charset, repeat=length)
+    
+    # Transform tuples from itertools into strings: ('a', 'b') -> 'ab'
+    string_generator = ("".join(c) for c in combos_generator)
+    
+    total_processed = 0
+    print(f"Starting GPU execution loop in batches of {batch_size:,}...")
+
+    # 2. Iterate through the generator in memory-safe chunks
+    for batch_num, candidate_batch in enumerate(chunked_iterable(string_generator, batch_size)):
+        
+        # Pass the current list chunk directly to your existing PyCUDA function
+        # This copies the chunk to the GPU, runs 1,000 rounds, and returns results
+        gpu_results = run_sha256crypt_gpu(candidate_batch, salt_str)
+        
+        total_processed += len(candidate_batch)
+        print(f"Batch {batch_num + 1} finished. Total computed: {total_processed:,}")
+        
+        # --- Handle or Check Results Here ---
+        # For demonstration, let's just inspect the first result of the batch
+        # In a real tool, you would check if any result matches your target hash here
+        # if target_hash in gpu_results: return ...
+        
+    print("\nAll combinations processed successfully.")
+
+
+
+
+
+
 # --- Execution Demonstration ---
 if __name__ == "__main__":
 
     salt = "89w0wWD1vujG.3F7"
-    candidates = ["password", "secret123", "admin", "12345678"]
 
-    print(f"Launching batch execution for {len(candidates)} items over 1000 iterations entirely on GPU...")
-    results = run_sha256crypt_gpu(candidates, salt) 
-    for c, h in zip(candidates, results):
-        print(f"Candidate: {c:12} -> {h}")
-    
+    with open('../dictionaries/common.txt', 'r') as fp:
+        common = fp.read().splitlines()
+
+
+        # Process the generator on the GPU in chunks of 500k candidates at a time
+    process_combinations_on_gpu(common, 3, salt, batch_size=500000)
