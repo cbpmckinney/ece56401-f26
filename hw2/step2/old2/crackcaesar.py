@@ -5,16 +5,32 @@ from multiprocessing import Pool
 import math
 import time 
 from datetime import timedelta
-from lengthbuckets import iter_length_buckets, count_length_buckets
+from hw2.step2.old2.lengthbuckets import iter_length_buckets, count_length_buckets
 import smtplib
 from email.message import EmailMessage
 import json
 import os
 
 targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$Q/nOKF5ECoPwQIJAZSlNcRt21Y3b1eV42Usj5SkfBX9'
+#targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$1iAvzyCgCA7PxGXOIHnaKKuL1HcaFs.IGrFpDdsLWbD'
 
 scriptname = os.path.basename(__file__)
-jobdescription = "GOT words"
+jobdescription = "Caesar cipher for uncommon words"
+
+def caesar(password: str, shamt: int) -> str:
+    ans = ''
+    for i in range(len(password)):
+        curchar = password[i]
+        if curchar.isalpha():
+            if curchar.islower:
+                ans += chr((ord(curchar) - 0x61 + shamt) % 26 + 0x61)
+            else:
+                ans += chr((ord(curchar) - 0x41 + shamt) % 26 + 0x41)
+
+        else:
+            ans += curchar
+
+    return ans
 
 
 
@@ -54,34 +70,17 @@ def log_job(record):
     with open('attacklog.json', 'a') as f:
         f.write(json.dumps(record) + '\n')
 
-def rotations(word):
-    n = len(word)
-    return (word[i:] + word[:i] for i in range(1, n))
-
-def case_variants(word):
-    choices = [(c.lower(), c.upper()) if c.lower() != c.upper() else (c,) for c in word]
-    return (''.join(t) for t in itertools.product(*choices))
-
-def case_variant_count(word):
-    return 2 ** sum(1 for c in word if c.lower() != c.upper())
-
 
 def main():
 
-    ip = open('dictionaries/GOT.txt', 'r')
-    GOT = ip.read().splitlines()
+    ip = open('dictionaries/uncommon.txt', 'r')
+    uncommon = ip.read().splitlines()
     ip.close()
 
-
-    #lowers = (password.lower() for password in GOT)
-    #uppers = (password.upper() for password in GOT)
-    #casevariants  = (v for word in GOT for v in case_variants(word))
-    
-
-    all_candidates = itertools.chain(lowers, uppers, casevariants)
-    total = 2*len(GOT) + sum(case_variant_count(password) for password in GOT)
+    all_candidates = (caesar(p, i) for p in uncommon for i in range(1,26))
 
     count = 0
+    total = 25*len(uncommon)
 
 
     start = time.perf_counter()

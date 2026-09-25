@@ -5,19 +5,15 @@ from multiprocessing import Pool
 import math
 import time 
 from datetime import timedelta
-from lengthbuckets import iter_length_buckets, count_length_buckets
+from hw2.step2.old2.lengthbuckets import iter_length_buckets, count_length_buckets
 import smtplib
 from email.message import EmailMessage
 import json
 import os
 
 targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$Q/nOKF5ECoPwQIJAZSlNcRt21Y3b1eV42Usj5SkfBX9'
-
 scriptname = os.path.basename(__file__)
-jobdescription = "Rotations for GOT words"
-
-
-
+jobdescription = "Append and prepend Bob's old password to all"
 
 
 def send_notification(subject, body):
@@ -54,21 +50,28 @@ def log_job(record):
     with open('attacklog.json', 'a') as f:
         f.write(json.dumps(record) + '\n')
 
-def rotations(word):
-    n = len(word)
-    return (word[i:] + word[:i] for i in range(1, n))
 
 def main():
 
-    ip = open('dictionaries/GOT.txt', 'r')
+    punct = string.punctuation
+    digits = string.digits 
+
+    ip = open('dictionaries/common.txt', 'r')
+    common = ip.read().splitlines()
+    ip.close()
+
+    ip = open('dictionaries/all.txt', 'r')
     all = ip.read().splitlines()
     ip.close()
 
+    oldbob = ['bwAEBIMs']
 
-    all_candidates = (r for password in all for r in rotations(password))
-    total = sum(len(password) - 1 for password in all)
+    cross1a = (''.join(t) for t in itertools.product(all, oldbob))
+    cross1b = (''.join(t) for t in itertools.product(oldbob, all))
 
+    all_candidates = itertools.chain(cross1a, cross1b)
     count = 0
+    total = 2*len(all)
 
 
     start = time.perf_counter()

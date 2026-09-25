@@ -5,7 +5,7 @@ from multiprocessing import Pool
 import math
 import time 
 from datetime import timedelta
-from lengthbuckets import iter_length_buckets, count_length_buckets
+from hw2.step2.old2.lengthbuckets import iter_length_buckets, count_length_buckets
 import smtplib
 from email.message import EmailMessage
 import json
@@ -14,7 +14,7 @@ import os
 targethash = '$y$j9T$F/vLDJRdzzspQonYxyqKl1$Q/nOKF5ECoPwQIJAZSlNcRt21Y3b1eV42Usj5SkfBX9'
 
 scriptname = os.path.basename(__file__)
-jobdescription = "Lower case for common words"
+jobdescription = "Rotations for GOT words"
 
 
 
@@ -58,22 +58,15 @@ def rotations(word):
     n = len(word)
     return (word[i:] + word[:i] for i in range(1, n))
 
-def case_variants(word):
-    choices = [(c.lower(), c.upper()) if c.lower() != c.upper() else (c,) for c in word]
-    return (''.join(t) for t in itertools.product(*choices))
-
-def case_variant_count(word):
-    return 2 ** sum(1 for c in word if c.lower() != c.upper())
-
-
 def main():
 
-    ip = open('dictionaries/all.txt', 'r')
+    ip = open('dictionaries/GOT.txt', 'r')
     all = ip.read().splitlines()
     ip.close()
 
-    all_candidates = (password.lower() for password in all)
-    total = len(all)
+
+    all_candidates = (r for password in all for r in rotations(password))
+    total = sum(len(password) - 1 for password in all)
 
     count = 0
 
