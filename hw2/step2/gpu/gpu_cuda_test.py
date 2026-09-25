@@ -302,6 +302,7 @@ def process_combinations_on_gpu(charset, length, salt_str, batch_size=500000):
 if __name__ == "__main__":
 
     salt = "89w0wWD1vujG.3F7"
+    #test
 
     with open('../dictionaries/common.txt', 'r') as fp:
         common = fp.read().splitlines()
