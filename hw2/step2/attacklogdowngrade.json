@@ -1,1 +1,8 @@
 {"script": "crackconcat.py", "description": "DOWNGRADE Concatenation test", "count": 7907344, "result": "Failure"}
+{"script": "crackconcat.py", "description": "DOWNGRADE Concatenation common * zipf_min6", "count": 539904, "result": "Failure"}
+{"script": "crackconcat.py", "description": "DOWNGRADE Concatenation common * zipf_min5", "count": 5190952, "result": "Failure"}
+{"script": "crackconcat.py", "description": "DOWNGRADE Concatenation common * zipf4", "count": 117, "result": "Failure"}
+{"script": "crackconcat.py", "description": "DOWNGRADE Concatenation common * zipf4", "count": 117, "result": "Failure"}
+{"script": "crackconcat.py", "description": "DOWNGRADE Concatenation common * zipf4", "count": 117, "result": "Failure"}
+{"script": "crackconcat.py", "description": "DOWNGRADE Concatenation common * zipf4", "count": 117, "result": "Failure"}
+{"script": "crackconcat.py", "description": "DOWNGRADE Concatenation common * zipf4", "count": 111100, "result": "Failure"}

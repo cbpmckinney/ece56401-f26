@@ -9,16 +9,16 @@ import smtplib
 from email.message import EmailMessage
 import json
 import os
+from wordfreq import zipf_frequency
 
-with open("target.key", 'r') as fp:
+
+
+
+with open("target.txt", 'r') as fp:
     targethash = fp.read()
 
-
 scriptname = os.path.basename(__file__)
-jobdescription = "DOWNGRADE Concatenation test"
-
-
-
+jobdescription = "DOWNGRADE Concatenation common * zipf4"
 
 
 def send_notification(subject, body):
@@ -37,6 +37,7 @@ def send_notification(subject, body):
         smtp.login(keyaddr, keypass)
         smtp.send_message(msg)
 
+
 def check_candidate(candidate: str):
 
     result = crypt.crypt(candidate, targethash)
@@ -44,8 +45,7 @@ def check_candidate(candidate: str):
         return candidate
     else:
         return None
-
-# password hash method is yescrypt
+    
 
 def product_size(*iterables):
     return math.prod(len(it) for it in iterables)
@@ -55,9 +55,7 @@ def log_job(record):
     with open('attacklogdowngrade.json', 'a') as f:
         f.write(json.dumps(record) + '\n')
 
-def rotations(word):
-    n = len(word)
-    return (word[i:] + word[:i] for i in range(1, n))
+
 
 
 def main():
@@ -65,11 +63,35 @@ def main():
     with open('dictionaries/common.txt', 'r') as f:
         common = f.read().splitlines()
 
-    cross1a = (''.join(t) for t in itertools.product(common, common))
+    with open('dictionaries/uncommon_by_zipf.txt', 'r') as f:
+        uncommon = f.read().splitlines()
 
+
+
+    zipf_min7 = [w for w in uncommon if zipf_frequency(w.lower(), 'en') >= 7]
+    zipf_min6 = [w for w in uncommon if zipf_frequency(w.lower(), 'en') >= 5]
+
+    zipf_min = []
+    zipf = []
+    for i in range(7,0,-1):
+        zipf_min += [[w for w in uncommon if zipf_frequency(w.lower(), 'en') >= i]]
+        zipf += [[w for w in uncommon if (zipf_frequency(w.lower(), 'en') >= i) and (zipf_frequency(w.lower(), 'en') < (i+1))]]
+
+    #print(zipf_min[1])
     
-    all_candidates = itertools.chain(cross1a)
-    total = len(common)**2
+    cross1a = (''.join(t) for t in itertools.product(zipf_min[1], repeat =2))
+    cross1b = (''.join(t) for t in itertools.product(zipf_min[1], repeat =3))
+    cross1c = (''.join(t) for t in itertools.product(zipf_min[1], repeat =4))
+    #cross1d = (''.join(t) for t in itertools.product(zipf_min[1], repeat =5))
+
+    #cross2a = (''.join(t) for t in itertools.product(zipf_min[1], repeat =2))
+    #cross2b = (''.join(t) for t in itertools.product(zipf_min[1], repeat =3))
+    #cross2c = (''.join(t) for t in itertools.product(zipf_min[1], repeat =4))
+
+
+    all_candidates = itertools.chain(cross1a, cross1b, cross1c)
+
+    total = len(zipf_min[1])**2 + len(zipf_min[1])**3 + len(zipf_min[1])**4 
 
     count = 0
 
