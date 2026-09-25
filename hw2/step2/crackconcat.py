@@ -79,9 +79,9 @@ def main():
 
     #print(zipf_min[1])
     
-    cross1a = (''.join(t) for t in itertools.product(zipf_min[1], repeat =2))
-    cross1b = (''.join(t) for t in itertools.product(zipf_min[1], repeat =3))
-    cross1c = (''.join(t) for t in itertools.product(zipf_min[1], repeat =4))
+    #cross1a = (''.join(t) for t in itertools.product(zipf_min[1], repeat =2))
+    cross1b = (''.join(t) for t in itertools.product(common, repeat =3))
+    #cross1c = (''.join(t) for t in itertools.product(zipf_min[1], repeat =4))
     #cross1d = (''.join(t) for t in itertools.product(zipf_min[1], repeat =5))
 
     #cross2a = (''.join(t) for t in itertools.product(zipf_min[1], repeat =2))
@@ -89,9 +89,9 @@ def main():
     #cross2c = (''.join(t) for t in itertools.product(zipf_min[1], repeat =4))
 
 
-    all_candidates = itertools.chain(cross1a, cross1b, cross1c)
+    all_candidates = itertools.chain(cross1b)
 
-    total = len(zipf_min[1])**2 + len(zipf_min[1])**3 + len(zipf_min[1])**4 
+    total = len(common)**3
 
     count = 0
 
