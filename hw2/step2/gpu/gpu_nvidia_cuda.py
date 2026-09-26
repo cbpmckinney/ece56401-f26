@@ -63,10 +63,11 @@ import sys
 import time
 import json
 import math
+import ast
 import smtplib
 import itertools
 import multiprocessing as mp
-from datetime import timedelta
+from datetime import timedelta, datetime
 from email.message import EmailMessage
 
 import numpy as np
@@ -99,6 +100,18 @@ MP_CTX = mp.get_context('spawn')
 # the order nvidia-smi lists them). Use a single-element list (e.g. [0])
 # to pin this to one GPU instead of splitting.
 GPU_DEVICES = [0, 1]
+
+# Where completed ("ruled out") patterns are recorded, one per line, in
+# the exact format str(pattern) writes them (e.g. "(0, 0, 1)"). Read back
+# at startup by load_already_done() so a restarted run resumes instead of
+# re-checking patterns that were already fully exhausted.
+ALREADY_DONE_LOG_PATH = 'attacklog_gpu_concat_nvidia.json'
+
+# Belt-and-suspenders record of a found password: written to disk in
+# addition to the terminal print (report_progress's 'success' message)
+# and the email notification, so it survives even if you miss the email
+# or a dropped terminal/SSH session eats the printed output.
+FOUND_PASSWORD_LOG_PATH = 'found_password.txt'
 
 
 def decode_sha256_crypt_checksum(hash_string):
@@ -214,7 +227,7 @@ def _run_candidate_batches(kernel, candidates, salt_buf, salt_len, target_arr,
 
 
 def process_candidates_on_nvidia_gpu(candidates, salt_str, target_hash,
-                                      batch_size=200000, max_candidate_len=64,
+                                      batch_size=2000000, max_candidate_len=64,
                                       total=None, print_interval=5,
                                       progress_callback=None, threads_per_block=256,
                                       device_id=0):
@@ -316,7 +329,7 @@ def _gpu_pattern_worker(device_id, worker_id, sub_pool, rest_pools, salt_str, ta
 
 
 def process_pattern_multi_gpu(pool_tuple, salt_str, target_hash, gpu_devices,
-                               batch_size=250000, max_candidate_len=64,
+                               batch_size=2000000, max_candidate_len=64,
                                total=None, print_interval=5, progress_callback=None):
     """
     Runs one whole pattern (e.g. common x common x common) across all of
@@ -421,8 +434,51 @@ def process_pattern_multi_gpu(pool_tuple, salt_str, target_hash, gpu_devices,
     return None
 
 
-def log_job(pattern):
-    with open('attacklog_gpu_concat_nvidia.json', 'a') as f:
+def save_found_password(password, pattern, total, log_path=FOUND_PASSWORD_LOG_PATH):
+    """
+    Append the found password (plus context: which pattern it came from,
+    how many candidates that pattern had, and a timestamp) to a plain
+    text file, in addition to printing it and emailing it -- a third,
+    independent way to make sure it isn't lost.
+    """
+    record = (
+        f"FOUND at {datetime.now().isoformat(timespec='seconds')}\n"
+        f"  script:      {scriptname}\n"
+        f"  description: {jobdescription}\n"
+        f"  pattern:     {pattern}\n"
+        f"  candidates in pattern: {total:,}\n"
+        f"  password:    {password}\n\n"
+    )
+    with open(log_path, 'a') as f:
+        f.write(record)
+
+
+def load_already_done(log_path=ALREADY_DONE_LOG_PATH):
+    """
+    Reload the set of already-completed (fully-exhausted) patterns from
+    the attack log, so a restarted run resumes where a previous one left
+    off instead of re-checking patterns that can take hours each. Starts
+    fresh (empty set) if the log doesn't exist yet. Tolerates a stray
+    unparseable line (e.g. if the file got truncated mid-write) by
+    skipping it with a warning rather than crashing the whole run.
+    """
+    done = set()
+    if not os.path.exists(log_path):
+        return done
+    with open(log_path, 'r') as f:
+        for line_no, line in enumerate(f, start=1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                done.add(ast.literal_eval(line))
+            except (ValueError, SyntaxError):
+                print(f"  (warning: skipping unparseable line {line_no} in {log_path}: {line!r})")
+    return done
+
+
+def log_job(pattern, log_path=ALREADY_DONE_LOG_PATH):
+    with open(log_path, 'a') as f:
         f.write(str(pattern) + '\n')
 
 
@@ -469,19 +525,23 @@ def main():
         pools[key] = zipf[key - 1]
 
     k = 3
-    already_done = set()
+    already_done = load_already_done()
+    if already_done:
+        print(f"Resuming: {len(already_done)} pattern(s) already completed per "
+              f"{ALREADY_DONE_LOG_PATH}, skipping those.")
 
-    band_score = {0: 8}                      # treat `common` as highest priority
-    for key in range(1, 8):
-        band_score[key] = 8 - key            # pool 1 = zipf 7.x -> 7, pool 7 = zipf 1.x -> 1
+    def pattern_sort_key(pattern):
+        # Most-probable-first: a pattern's RAREST component dominates how
+        # unlikely a candidate from it is, so sort primarily by the
+        # highest-numbered (rarest) pool label present in the pattern, then
+        # by the next-rarest, and so on. Pool 0 (common) is most probable;
+        # pool 7 (zipf 1.x) is least. This guarantees, e.g., that every
+        # pattern built only from common words and zipf bands 6-7 is fully
+        # exhausted before any pattern containing so much as one zipf-5
+        # word is attempted -- and the same all the way down to zipf-1.
+        return tuple(sorted(pattern, reverse=True))
 
-    def pattern_score(pattern):
-        return sum(band_score[label] for label in pattern)
-
-    patterns = sorted(
-        itertools.product(pools, repeat=k),
-        key=lambda p: (-pattern_score(p), product_size(*(pools[l] for l in p)))
-    )
+    patterns = sorted(itertools.product(pools, repeat=k), key=pattern_sort_key)
 
     def report_progress(kind, **info):
         if kind == 'skipped':
@@ -508,16 +568,21 @@ def main():
 
     for pattern in patterns:   # e.g. (0, 0, 1)
         if pattern in already_done:
+            #body = f'Skipping pattern {pattern}'
+            #subject = body
+            #send_notification(subject, body)
             continue
 
         pool_tuple = tuple(pools[label] for label in pattern)
         total = product_size(*pool_tuple)
         print(f'Attempting pattern {str(pattern)}: {total} candidates to compute of grand total {(commontotal + zipftotal)**3}')
+        send_notification(f'Starting pattern {pattern}', f'Starting pattern {pattern}')
 
         password = process_pattern_multi_gpu(pool_tuple, salt, target_hash, GPU_DEVICES,
-                                              batch_size=250000, total=total,
+                                              batch_size=2000000, total=total,
                                               progress_callback=report_progress)
         if password is not None:
+            save_found_password(password, pattern, total)
             record = {"script": scriptname, "description": jobdescription, "count": total,
                       "result": f'Success: password is {password}'}
             body = json.dumps(record, indent=2)
@@ -526,6 +591,7 @@ def main():
 
         already_done.add(pattern)
         log_job(pattern)
+        send_notification(f'Completed pattern {pattern}', f'Completed pattern {pattern}')
 
 
 if __name__ == "__main__":
