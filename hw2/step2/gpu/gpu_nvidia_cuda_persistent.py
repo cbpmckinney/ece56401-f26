@@ -67,6 +67,7 @@ import threading
 import multiprocessing as mp
 from datetime import timedelta, datetime
 from email.message import EmailMessage
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 from wordfreq import zipf_frequency
@@ -127,80 +128,127 @@ def chunked_iterable(iterable, size):
         yield chunk
 
 
+def _prepare_batch(candidate_batch, max_candidate_len):
+    """
+    The host-side, pure-CPU/numpy half of processing one batch: filter out
+    any candidate too long for the kernel's fixed-size buffers, then build
+    the flat, null-padded byte buffer the kernel expects. No CUDA calls in
+    here at all -- that's what lets this run in a background thread (see
+    _run_candidate_batches) while the GPU is busy with the PREVIOUS batch,
+    instead of the GPU sitting idle waiting for this to finish first.
+    """
+    safe_batch = [c for c in candidate_batch if len(c) <= max_candidate_len]
+    skipped = len(candidate_batch) - len(safe_batch)
+    if not safe_batch:
+        return safe_batch, None, 0, skipped
+
+    max_pass_len = max(len(c) for c in safe_batch) + 1  # +1: null terminator the kernel scans for
+    flat_passwords = np.zeros(len(safe_batch) * max_pass_len, dtype=np.uint8)
+    for idx, cand in enumerate(safe_batch):
+        c_bytes = cand.encode('utf-8')
+        start = idx * max_pass_len
+        flat_passwords[start: start + len(c_bytes)] = np.frombuffer(c_bytes, dtype=np.uint8)
+    return safe_batch, flat_passwords, max_pass_len, skipped
+
+
 def _run_candidate_batches(kernel, candidates, salt_buf, salt_len, target_arr,
                             batch_size, max_candidate_len, total, print_interval,
                             progress_callback, stop_event=None, threads_per_block=256):
     """
-    Unchanged from gpu_nvidia_cuda.py -- see that file for the full
-    docstring. Shared batching/dispatch/matching loop, now called by
-    _persistent_gpu_worker once per pattern task instead of once per
-    spawned process.
+    Shared batching/dispatch/matching loop, called by _persistent_gpu_worker
+    once per pattern task and by the single-GPU standalone path.
+
+    PIPELINED vs. the original version: building the NEXT batch's host-side
+    candidate buffer (_prepare_batch -- pure Python/numpy, no CUDA) now runs
+    in a background thread while THIS batch's GPU work (htod copy, kernel,
+    dtoh copy) runs on the main thread. Before this change the two were
+    strictly sequential -- build buffer, THEN talk to the GPU, THEN build
+    the next buffer -- which meant the GPU sat completely idle for however
+    long the host-side buffer-building took, every single batch, all
+    pattern long (confirmed by a standalone benchmark: ~1.8s of pure CPU
+    time to build one 2,000,000-candidate buffer, which is not a rounding
+    error next to the GPU's own per-batch time -- and it lines up with the
+    square-wave GPU utilization and pinned ~100% CPU on the worker process
+    you were seeing in nvtop). The background thread only ever touches
+    plain numpy arrays, never the CUDA context, so there's no cross-thread
+    CUDA-context issue -- only the main thread makes CUDA calls.
     """
     total_checked = 0
     start_time = time.perf_counter()
     last_print = start_time
 
-    for candidate_batch in chunked_iterable(candidates, batch_size):
-        if stop_event is not None and stop_event.is_set():
-            break
+    batch_iter = chunked_iterable(candidates, batch_size)
+    executor = ThreadPoolExecutor(max_workers=1)
+    try:
+        raw_batch = next(batch_iter, None)
+        pending = executor.submit(_prepare_batch, raw_batch, max_candidate_len) if raw_batch is not None else None
 
-        safe_batch = [c for c in candidate_batch if len(c) <= max_candidate_len]
-        skipped = len(candidate_batch) - len(safe_batch)
-        if skipped and progress_callback:
-            progress_callback('skipped', skipped=skipped, max_len=max_candidate_len)
-        if not safe_batch:
-            continue
+        while pending is not None:
+            if stop_event is not None and stop_event.is_set():
+                break
 
-        num_items = len(safe_batch)
-        max_pass_len = max(len(c) for c in safe_batch) + 1  # +1: null terminator the kernel scans for
+            safe_batch, flat_passwords, max_pass_len, skipped = pending.result()
 
-        flat_passwords = np.zeros(num_items * max_pass_len, dtype=np.uint8)
-        for idx, cand in enumerate(safe_batch):
-            c_bytes = cand.encode('utf-8')
-            start = idx * max_pass_len
-            flat_passwords[start: start + len(c_bytes)] = np.frombuffer(c_bytes, dtype=np.uint8)
+            # Kick off preparing the NEXT batch now, in the background,
+            # before doing any GPU work for the current one -- that's the
+            # whole point: this overlaps with the GPU work below instead
+            # of happening after it.
+            raw_batch = next(batch_iter, None)
+            pending = executor.submit(_prepare_batch, raw_batch, max_candidate_len) if raw_batch is not None else None
 
-        pass_buf = cuda.mem_alloc(flat_passwords.nbytes)
-        cuda.memcpy_htod(pass_buf, flat_passwords)
-        out_buf = cuda.mem_alloc(num_items * 32)
+            if skipped and progress_callback:
+                progress_callback('skipped', skipped=skipped, max_len=max_candidate_len)
+            if not safe_batch:
+                continue
 
-        blocks = (num_items + threads_per_block - 1) // threads_per_block
-        kernel(pass_buf, np.int32(max_pass_len),
-               salt_buf, np.int32(salt_len),
-               out_buf, np.int32(num_items),
-               block=(threads_per_block, 1, 1), grid=(blocks, 1))
+            num_items = len(safe_batch)
 
-        output_digests = np.empty(num_items * 32, dtype=np.uint8)
-        cuda.memcpy_dtoh(output_digests, out_buf)
+            pass_buf = cuda.mem_alloc(flat_passwords.nbytes)
+            cuda.memcpy_htod(pass_buf, flat_passwords)
+            out_buf = cuda.mem_alloc(num_items * 32)
 
-        # Explicitly free this batch's device buffers rather than relying
-        # on Python GC to get to them eventually -- this loop can allocate
-        # a lot of short-lived device memory over a long run.
-        pass_buf.free()
-        out_buf.free()
+            blocks = (num_items + threads_per_block - 1) // threads_per_block
+            kernel(pass_buf, np.int32(max_pass_len),
+                   salt_buf, np.int32(salt_len),
+                   out_buf, np.int32(num_items),
+                   block=(threads_per_block, 1, 1), grid=(blocks, 1))
 
-        digest_matrix = output_digests.reshape(num_items, 32)
-        matches = np.all(digest_matrix == target_arr, axis=1)
-        total_checked += num_items
+            output_digests = np.empty(num_items * 32, dtype=np.uint8)
+            cuda.memcpy_dtoh(output_digests, out_buf)
 
-        if matches.any():
-            match_idx = int(np.argmax(matches))
-            found_password = safe_batch[match_idx]
-            elapsed = time.perf_counter() - start_time
-            rate = total_checked / elapsed if elapsed > 0 else 0
-            if progress_callback:
-                progress_callback('success', password=found_password,
-                                   total_checked=total_checked, elapsed=elapsed, rate=rate)
-            return found_password, total_checked, elapsed
+            # Explicitly free this batch's device buffers rather than relying
+            # on Python GC to get to them eventually -- this loop can allocate
+            # a lot of short-lived device memory over a long run.
+            pass_buf.free()
+            out_buf.free()
 
-        now = time.perf_counter()
-        if now - last_print >= print_interval:
-            elapsed = now - start_time
-            rate = total_checked / elapsed if elapsed > 0 else 0
-            if progress_callback:
-                progress_callback('progress', total_checked=total_checked,
-                                   total=total, elapsed=elapsed, rate=rate)
-            last_print = now
+            digest_matrix = output_digests.reshape(num_items, 32)
+            matches = np.all(digest_matrix == target_arr, axis=1)
+            total_checked += num_items
+
+            if matches.any():
+                match_idx = int(np.argmax(matches))
+                found_password = safe_batch[match_idx]
+                elapsed = time.perf_counter() - start_time
+                rate = total_checked / elapsed if elapsed > 0 else 0
+                if progress_callback:
+                    progress_callback('success', password=found_password,
+                                       total_checked=total_checked, elapsed=elapsed, rate=rate)
+                return found_password, total_checked, elapsed
+
+            now = time.perf_counter()
+            if now - last_print >= print_interval:
+                elapsed = now - start_time
+                rate = total_checked / elapsed if elapsed > 0 else 0
+                if progress_callback:
+                    progress_callback('progress', total_checked=total_checked,
+                                       total=total, elapsed=elapsed, rate=rate)
+                last_print = now
+    finally:
+        # Don't wait for any still-in-flight prefetch (e.g. one left
+        # dangling by an early stop_event break) -- its result is simply
+        # never consumed, which is harmless.
+        executor.shutdown(wait=False)
 
     elapsed = time.perf_counter() - start_time
     rate = total_checked / elapsed if elapsed > 0 else 0
