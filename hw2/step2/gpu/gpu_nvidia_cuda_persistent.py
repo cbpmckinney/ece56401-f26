@@ -62,6 +62,8 @@ import math
 import ast
 import smtplib
 import itertools
+import queue
+import threading
 import multiprocessing as mp
 from datetime import timedelta, datetime
 from email.message import EmailMessage
@@ -587,6 +589,65 @@ def send_notification(subject, body):
         smtp.send_message(msg)
 
 
+# --- Background notifier -----------------------------------------------
+# send_notification() is a blocking SMTP login+send (TLS handshake, auth,
+# then the send itself -- commonly a second or more, sometimes several).
+# Calling it directly from main()'s pattern loop means that time sits
+# squarely between one pattern finishing and the next one being
+# dispatched to the GPU pool -- invisible when a pattern takes hours, but
+# a real, visible source of GPU idle time once patterns are fast (which
+# is exactly what happens once you've resumed past the biggest
+# common-word-heavy patterns). notify_async() queues the send for a
+# single background thread instead, so the main loop never blocks on the
+# network for a routine status email. It's best-effort by design: these
+# are a progress nicety, not the reliability channel for a found password
+# (that's the terminal print + found_password.txt + the resume log), so a
+# notification is dropped with a warning rather than blocking anything if
+# the queue is ever backed up (e.g. Gmail being slow/unreachable).
+_notification_queue = queue.Queue(maxsize=100)
+_notification_thread = None
+
+
+def _notification_worker():
+    while True:
+        item = _notification_queue.get()
+        if item is None:
+            break
+        subject, body = item
+        try:
+            send_notification(subject, body)
+        except Exception as exc:
+            print(f"  (warning: email notification {subject!r} failed to send: {exc})")
+
+
+def start_notifier():
+    global _notification_thread
+    if _notification_thread is not None:
+        return
+    _notification_thread = threading.Thread(target=_notification_worker, daemon=True)
+    _notification_thread.start()
+
+
+def notify_async(subject, body):
+    try:
+        _notification_queue.put_nowait((subject, body))
+    except queue.Full:
+        print(f"  (warning: notification queue full, dropping notification: {subject!r})")
+
+
+def stop_notifier(timeout=10):
+    """Give the background notifier up to `timeout` seconds to drain
+    whatever's still queued (e.g. a final 'Hashing Success!' email) before
+    the process exits, without blocking indefinitely if Gmail is slow or
+    unreachable."""
+    if _notification_thread is not None:
+        try:
+            _notification_queue.put_nowait(None)
+        except queue.Full:
+            pass
+        _notification_thread.join(timeout=timeout)
+
+
 def product_size(*iterables):
     return math.prod(len(it) for it in iterables)
 
@@ -658,19 +719,18 @@ def main():
     print(f"Starting {len(GPU_DEVICES)} persistent GPU worker(s) on device(s) {GPU_DEVICES}...")
     pool.start()
     print("GPU worker(s) ready.")
+    start_notifier()
 
     try:
         for pattern in patterns:   # e.g. (0, 0, 1)
             if pattern in already_done:
-                #body = f'Skipping pattern {pattern}'
-                #subject = body
-                #send_notification(subject, body)
+                #notify_async(f'Skipping pattern {pattern}', f'Skipping pattern {pattern}')
                 continue
 
             pool_tuple = tuple(pools[label] for label in pattern)
             total = product_size(*pool_tuple)
             print(f'Attempting pattern {str(pattern)}: {total} candidates to compute of grand total {(commontotal + zipftotal)**3}')
-            send_notification(f'Starting pattern {pattern}', f'Starting pattern {pattern}')
+            notify_async(f'Starting pattern {pattern}', f'Starting pattern {pattern}')
 
             password = pool.run_pattern(pool_tuple, batch_size=2000000, total=total,
                                          progress_callback=report_progress)
@@ -679,14 +739,15 @@ def main():
                 record = {"script": scriptname, "description": jobdescription, "count": total,
                           "result": f'Success: password is {password}'}
                 body = json.dumps(record, indent=2)
-                send_notification('Hashing Success!', body)
+                notify_async('Hashing Success!', body)
                 return
 
             already_done.add(pattern)
             log_job(pattern)
-            send_notification(f'Completed pattern {pattern}', f'Completed pattern {pattern}')
+            notify_async(f'Completed pattern {pattern}', f'Completed pattern {pattern}')
     finally:
         pool.shutdown()
+        stop_notifier()
 
 
 if __name__ == "__main__":
