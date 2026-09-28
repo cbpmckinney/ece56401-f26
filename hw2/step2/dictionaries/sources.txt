@@ -1,0 +1,84 @@
+Sources used to build the "Bob" thematic corpus for build_bob_dictionary.py.
+Vocabulary was extracted from these articles' text (non-proper-noun common
+vocabulary only), not copied verbatim. No copyrighted lyrics were scraped
+for the pirate theme -- see note below.
+
+GoT theme (targets: Arya Stark, Jon Snow, Tyrion Lannister -- "dragon-related"):
+  https://awoiaf.westeros.org/index.php/House_Stark
+  https://awoiaf.westeros.org/index.php/House_Targaryen
+  https://awoiaf.westeros.org/index.php/House_Lannister
+  https://awoiaf.westeros.org/index.php/Dragon
+  https://awoiaf.westeros.org/index.php/Iron_Throne
+  https://awoiaf.westeros.org/index.php/Wall
+
+Heist / bank-theft theme (Bob's own MO -- fictional bank terminal, stealing money):
+  https://en.wikipedia.org/wiki/Bank_robbery
+  https://en.wikipedia.org/wiki/Heist_film
+  https://en.wikipedia.org/wiki/Confidence_trick
+  https://en.wikipedia.org/wiki/Safecracking
+
+Pirate / treasure / shark theme (Bob had a file linking to a YouTube video --
+"The Most Precious Treasure" by Sharkman Frank, from the kids' pirate-themed
+album "Sharkman Frank's Treasure Hunt"). We did NOT scrape the song's own
+lyrics (copyrighted creative content) -- instead we used the genre/theme it
+belongs to, the same way the heist theme above came from a general "heist
+film" article rather than any one film's actual script:
+  https://en.wikipedia.org/wiki/Piracy
+  https://en.wikipedia.org/wiki/Buried_treasure
+  https://en.wikipedia.org/wiki/Shark
+
+Radio / audio-hardware theme (Bob's file also mentioned an Intel audio card,
+NYC public radio, and "StreamGuys" -- a real internet-radio streaming
+provider commonly used by public-radio stations):
+  https://en.wikipedia.org/wiki/Public_broadcasting
+  https://en.wikipedia.org/wiki/Sound_card
+
+A small hand-curated set of terms not reliably present in the source
+articles verbatim -- e.g. "terminal"/"atm"/"pin" (heist), "frank"/"man"
+(Sharkman Frank), "intel"/"stream"/"guys"/"podcast"/"nyc" (radio/tech) --
+is added directly in build_bob_dictionary.py (HAND_CURATED_TERMS), kept
+separate and labeled so the methodology stays clear about what was sourced
+vs. assumed.
+
+--- bob2.txt (larger, ~2500-entry version) additional sources ---
+These were appended to corpus_<theme>_extra.txt files (merged into the
+same got/heist/pirate/radio themes as above, corpus_got.txt etc. above
+were left untouched so bob.txt did not change):
+
+GoT: https://awoiaf.westeros.org/index.php/Valyria
+     https://awoiaf.westeros.org/index.php/White_Walkers
+     https://awoiaf.westeros.org/index.php/Night%27s_Watch
+     https://awoiaf.westeros.org/index.php/Jon_Snow
+     https://awoiaf.westeros.org/index.php/Tyrion_Lannister
+     https://en.wikipedia.org/wiki/Heraldry
+     https://awoiaf.westeros.org/index.php/Faceless_Men
+     https://awoiaf.westeros.org/index.php/Direwolf
+     (attempted https://awoiaf.westeros.org/index.php/Arya_Stark and
+     https://en.wikipedia.org/wiki/Organized_crime but the extraction
+     came back corrupted/errored and was discarded rather than used)
+
+Heist: https://en.wikipedia.org/wiki/Money_laundering
+       https://en.wikipedia.org/wiki/Burglary
+       https://en.wikipedia.org/wiki/Identity_theft
+       https://en.wikipedia.org/wiki/Wire_fraud
+       https://en.wikipedia.org/wiki/Forgery
+       https://en.wikipedia.org/wiki/Espionage
+       https://en.wikipedia.org/wiki/Safe_deposit_box
+
+Pirate: https://en.wikipedia.org/wiki/Golden_Age_of_Piracy
+        https://en.wikipedia.org/wiki/Jolly_Roger
+        https://en.wikipedia.org/wiki/Ship
+        https://en.wikipedia.org/wiki/Compass
+        https://en.wikipedia.org/wiki/Cove
+        https://en.wikipedia.org/wiki/Lighthouse
+        https://en.wikipedia.org/wiki/Scuba_diving
+        https://en.wikipedia.org/wiki/Fishing
+
+Radio: https://en.wikipedia.org/wiki/Internet_radio
+       https://en.wikipedia.org/wiki/NPR
+       https://en.wikipedia.org/wiki/WNYC
+       https://en.wikipedia.org/wiki/Computer_hardware
+       https://en.wikipedia.org/wiki/Amplitude_modulation
+       https://en.wikipedia.org/wiki/Antenna_(radio)
+       https://en.wikipedia.org/wiki/Loudspeaker
+       https://en.wikipedia.org/wiki/Broadcast_engineering

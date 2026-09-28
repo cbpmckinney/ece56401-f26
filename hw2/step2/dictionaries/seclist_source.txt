@@ -1,0 +1,22 @@
+seclist.txt: a ranked (most- to least-common) list of real-world passwords,
+pulled from the SecLists repository's "10k-most-common.txt"
+(Passwords/Common-Credentials/10k-most-common.txt in
+https://github.com/danielmiessler/SecLists), which compiles real observed
+password frequency (in the lineage of Mark Burnett's "10 million password
+list" / the classic RockYou-era common-password compilations).
+
+Rank in this file = real-world popularity rank (line 1 = most commonly
+used password observed in the source data, etc.) -- unlike common.txt /
+all.txt, this ordering is NOT alphabetical and NOT English-word-frequency
+based; it is empirical password-choice frequency.
+
+NOTE ON COMPLETENESS: the retrieval tooling available in this session
+could only pull back roughly the first ~130 entries of this list before
+truncating -- the full published file goes to 10,000 (and SecLists also
+hosts 100,000- and 1,000,000-entry cuts of the same underlying ranked
+compilation). If a larger cut is obtained separately (e.g. downloaded
+directly and dropped into this folder, or via `pip install
+seclists`/`git clone` on a machine with normal internet access), it can
+be dropped in as seclist.txt (or as a second file) and reprocessed with
+build_seclist_pool.py below -- the script doesn't assume any particular
+length.

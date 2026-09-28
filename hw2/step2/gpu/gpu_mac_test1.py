@@ -506,31 +506,28 @@ def main():
     #target_hash = '$5$rounds=1000$89w0wWD1vujG.3F7$Q3t8zqhCfUhZ1MuhJxAjXyenoM5C14DmP0nlFUqjjiC'
     target_hash = "$5$rounds=1000$89w0wWD1vujG.3F7$iRqfu47TO3VKhxQJfmnELcdCsyl4T5wfCAPjihdera9"
 
-    with open("dictionaries/common.txt", "r") as fp:
-        common = fp.read().splitlines()
-    with open("dictionaries/uncommon_by_zipf.txt", "r") as fp:
-        uncommon = fp.read().splitlines()
+    with open("dictionaries/bob.txt", "r") as fp:
+        bob = fp.read().splitlines()
 
-    zipf = []
-    for i in range(7,0,-1):
-        zipf += [[w for w in uncommon if (zipf_frequency(w.lower(), 'en') >= i) and (zipf_frequency(w.lower(), 'en') < (i+1))]]
+    with open("dictionaries/bob2.txt", "r") as fp:
+        bob2 = fp.read().splitlines()
 
-    commontotal = len(common)
-    zipftotal = len(uncommon)
+
+
+    bobtotal = len(bob) + len(bob2)
+
 
 
     pools = {}
-    pools[0] = common
-    for key in range(1,8):
-        pools[key] = zipf[key-1] 
-
+    pools[0] = bob
+    pools[1] = bob2
 
     k = 3
     already_done = set()
+    already_done.add((0,0,0))
 
-    band_score = {0: 8}                      # treat `common` as highest priority
-    for key in range(1, 8):
-        band_score[key] = 8 - key            # pool 1 = zipf 7.x -> 7, pool 7 = zipf 1.x -> 1
+    band_score = {0: 8, 1:7}                      # treat `common` as highest priority
+
 
     def pattern_score(pattern):
         return sum(band_score[label] for label in pattern)
@@ -573,7 +570,7 @@ def main():
             continue
 
         total = product_size(*(pools[label] for label in pattern))
-        print(f'Attempting pattern {str(pattern)}: {total} candidates to compute of grand total {(commontotal + zipftotal)**3}')
+        print(f'Attempting pattern {str(pattern)}: {total} candidates to compute of grand total {(bobtotal)**3}')
 
         # One call per PATTERN, passing the whole candidate generator --
         # not one call per combo. (The previous version called this once
