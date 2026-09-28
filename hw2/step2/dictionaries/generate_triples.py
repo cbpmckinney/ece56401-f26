@@ -63,7 +63,20 @@ Usage:
 import argparse
 import itertools
 import os
+import signal
 import sys
+
+# Piping into `john --stdin` (or `head`, `less`, anything that can stop reading
+# early -- including John simply exiting once it cracks the hash) means the
+# read end of the pipe can close while this script is still writing. Without
+# this, Python turns the resulting SIGPIPE into a BrokenPipeError exception,
+# which prints a noisy traceback (and often a SECOND "Exception ignored"
+# message when the interpreter tries to flush stdout again at shutdown).
+# Restoring the default SIGPIPE handler makes the OS just kill the process
+# on the next write to a closed pipe, exactly like `yes | head` behaves --
+# no traceback, no exception handling needed for the common case.
+if hasattr(signal, "SIGPIPE"):
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_POOL = os.path.join(SCRIPT_DIR, "seclist_pool.txt")
@@ -114,26 +127,43 @@ def main():
     out = sys.stdout
     count = 0
     emitted = 0
-    for a, b, c in itertools.product(pool_a, pool_b, pool_c):
-        count += 1
-        candidate = a + b + c
+    try:
+        for a, b, c in itertools.product(pool_a, pool_b, pool_c):
+            count += 1
+            candidate = a + b + c
 
-        if args.min_len is not None and len(candidate) < args.min_len:
+            if args.min_len is not None and len(candidate) < args.min_len:
+                pass
+            elif args.max_len is not None and len(candidate) > args.max_len:
+                pass
+            else:
+                out.write(candidate)
+                out.write("\n")
+                emitted += 1
+
+            if args.progress_every and count % args.progress_every == 0:
+                print(f"[generate_triples] {count:,}/{total:,} considered "
+                      f"({emitted:,} emitted after length filtering)", file=sys.stderr)
+
+        out.flush()
+        print(f"[generate_triples] done: {count:,}/{total:,} considered, "
+              f"{emitted:,} written to stdout", file=sys.stderr)
+    except BrokenPipeError:
+        # The reader (john, head, etc.) closed its end before we finished --
+        # normal if it cracked the hash and exited, or if it errored out.
+        # Silence the "Exception ignored" noise Python would otherwise print
+        # while tearing down stdout, and exit non-zero so a `set -e` caller
+        # notices, without a traceback.
+        try:
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(devnull, sys.stdout.fileno())
+        except OSError:
             pass
-        elif args.max_len is not None and len(candidate) > args.max_len:
-            pass
-        else:
-            out.write(candidate)
-            out.write("\n")
-            emitted += 1
-
-        if args.progress_every and count % args.progress_every == 0:
-            print(f"[generate_triples] {count:,}/{total:,} considered "
-                  f"({emitted:,} emitted after length filtering)", file=sys.stderr)
-
-    out.flush()
-    print(f"[generate_triples] done: {count:,}/{total:,} considered, "
-          f"{emitted:,} written to stdout", file=sys.stderr)
+        print(f"[generate_triples] stopped early at {count:,}/{total:,} considered "
+              f"({emitted:,} emitted) -- reader closed the pipe (BrokenPipeError). "
+              f"If this is john, check its output/log to see whether it found the "
+              f"password or hit an error.", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
