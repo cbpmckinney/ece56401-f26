@@ -86,12 +86,7 @@ from passlib.handlers.sha2_crypt import _256_transpose_map
 
 
 scriptname = os.path.basename(__file__)
-jobdescription = "DOWNGRADE Concatenation pairs + known third word (NVIDIA/CUDA, persistent multi-GPU pool)"
-
-# The professor's hint told us the third word of the triple outright, so we
-# only need to search over (word1, word2) pairs now -- the third position
-# is pinned to this single known word instead of varying over a pool.
-KNOWN_THIRD_WORD = "pledgeor"
+jobdescription = "DOWNGRADE Concatenation triples (NVIDIA/CUDA, persistent multi-GPU pool)"
 
 KERNEL_SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sha256crypt_kernel.cu")
 
@@ -711,27 +706,22 @@ def main():
 
     with open("dictionaries/common.txt", "r") as fp:
         common = fp.read().splitlines()
-
     with open("dictionaries/uncommon_by_zipf.txt", "r") as fp:
         uncommon = fp.read().splitlines()
 
-    with open("dictionaries/uncommon_by_zipf0.txt", "r") as fp:
-        rare = fp.read().splitlines()
+    zipf = []
+    for i in range(7, 0, -1):
+        zipf += [[w for w in uncommon if (zipf_frequency(w.lower(), 'en') >= i) and (zipf_frequency(w.lower(), 'en') < (i + 1))]]
 
     commontotal = len(common)
     zipftotal = len(uncommon)
-    raretotal = len(rare)
-
-    total = commontotal + zipftotal + raretotal
-
 
     pools = {}
     pools[0] = common
-    pools[1] = uncommon
-    pools[2] = rare
+    for key in range(1, 8):
+        pools[key] = zipf[key - 1]
 
-    k = 2
-    
+    k = 3
     already_done = load_already_done()
     if already_done:
         print(f"Resuming: {len(already_done)} pattern(s) already completed per "
@@ -749,7 +739,6 @@ def main():
         return tuple(sorted(pattern, reverse=True))
 
     patterns = sorted(itertools.product(pools, repeat=k), key=pattern_sort_key)
-
 
     def report_progress(kind, **info):
         if kind == 'skipped':
@@ -786,13 +775,9 @@ def main():
                 #notify_async(f'Skipping pattern {pattern}', f'Skipping pattern {pattern}')
                 continue
 
-            pool_tuple = tuple(pools[label] for label in pattern) + ([KNOWN_THIRD_WORD],)
-            # pool_tuple is now (word1_pool, word2_pool, [KNOWN_THIRD_WORD]) -- run_pattern()
-            # and the GPU worker's itertools.product(sub_pool, *rest_pools) don't care that
-            # the last factor only has one element, so every candidate they generate ends
-            # in KNOWN_THIRD_WORD automatically.
+            pool_tuple = tuple(pools[label] for label in pattern)
             total = product_size(*pool_tuple)
-            print(f'Attempting pattern {str(pattern)}: {total} candidates to compute of grand total {total**2}')
+            print(f'Attempting pattern {str(pattern)}: {total} candidates to compute of grand total {(commontotal + zipftotal)**3}')
             notify_async(f'Starting pattern {pattern}', f'Starting pattern {pattern}')
 
             password = pool.run_pattern(pool_tuple, batch_size=2000000, total=total,
