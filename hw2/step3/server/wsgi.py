@@ -10,7 +10,7 @@ def hello_world():
 
 @app.route("/decrypt", methods=["POST"])
 def decrypt_view():
-    with open("templates/test2.crypt", "rb") as fp:
+    with open("templates/test.crypt", "rb") as fp:
         ciphertext = fp.read()
 
     password = request.form['password']
