@@ -505,8 +505,8 @@ def product_size(*iterables):
 def main():
     salt = "89w0wWD1vujG.3F7"
     #target_hash = '$5$rounds=1000$89w0wWD1vujG.3F7$Q3t8zqhCfUhZ1MuhJxAjXyenoM5C14DmP0nlFUqjjiC'
-    #target_hash = "$5$rounds=1000$89w0wWD1vujG.3F7$iRqfu47TO3VKhxQJfmnELcdCsyl4T5wfCAPjihdera9"
-    target_hash = '$5$rounds=1000$89w0wWD1vujG.3F7$oigtM4fCSbE3YRezalHa1A43AEt9iTrt0bYQjJSpVe3' #for password corvettehornypanties
+    target_hash = "$5$rounds=1000$89w0wWD1vujG.3F7$iRqfu47TO3VKhxQJfmnELcdCsyl4T5wfCAPjihdera9"
+    #target_hash = '$5$rounds=1000$89w0wWD1vujG.3F7$oigtM4fCSbE3YRezalHa1A43AEt9iTrt0bYQjJSpVe3' #for password corvettehornypanties
 
     with open("dictionaries/seclist_pool.txt", "r") as fp:
         seclist = fp.read().splitlines()
