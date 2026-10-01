@@ -1,4 +1,4 @@
-from encrypt import decrypt
+from hw2.step3.old.encrypt import decrypt
 
 import itertools
 import string

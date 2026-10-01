@@ -6,7 +6,7 @@ Usage: python step3test.py <password> <plaintext_file> [output_file]
 import sys
 import pyaes
 sys.path.insert(0, '.')   # adjust if encrypt.py lives elsewhere
-import encrypt            # the provided file, completely unmodified
+import hw2.step3.old.encrypt as encrypt            # the provided file, completely unmodified
 
 password = sys.argv[1]
 with open(sys.argv[2]) as fp:

@@ -20,7 +20,7 @@ Usage: python step3testdecode.py <password> <ciphertext_file>
 """
 import sys
 sys.path.insert(0, '.')   # adjust if encrypt.py lives elsewhere
-import encrypt            # the provided file, completely unmodified
+import hw2.step3.old.encrypt as encrypt            # the provided file, completely unmodified
 
 if len(sys.argv) != 3:
     print("Usage: python step3testdecode.py <password> <ciphertext_file>")

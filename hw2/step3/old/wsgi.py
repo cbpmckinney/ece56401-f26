@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, abort
-from encrypt import decrypt
+from hw2.step3.old.encrypt import decrypt
 
 app = Flask(__name__)
 
