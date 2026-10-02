@@ -6,10 +6,20 @@ from datetime import timedelta
 import smtplib
 from email.message import EmailMessage
 import string
+import re
 
+
+# GLOBAL DATA
 with open("server/templates/secret.html.crypt", "rb") as fp:
     ciphertext = fp.read()
 
+OLDPASSWORD = "aw2246french44pledgeor"
+WORD1 = "aw"
+WORD2 = "french"
+WORD3 = "pledgor"
+WORDS = (WORD1, WORD2, WORD3)
+NUMBERS = ("2246", "44")
+_CASE_PATTERNS = (str.upper, str.lower, str.capitalize, lambda w: w)
 
 
 def decrypt_target(password):
@@ -22,53 +32,82 @@ def decrypt_target(password):
     print(password)
     return plaintext
 
-def testing():
 
-    print("Testing password: password")
-    result = decrypt_target("password1234")
 
-    if result is not None:
-        print(result)
 
+def word_order_variants(words=WORDS):
+    for permutation in itertools.permutations(words):
+        yield ''.join(permutation)
+
+def digit_runs(s):
+    for m in re.finditer(r'\d+', s):
+        yield m.start(), m.end(), m.group()
+
+def number_mutations(s):
+    yield s
+    for start, end, digits in digit_runs(s):
+        for permutation in set(itertools.permutations(digits)):
+            yield s[:start] + ''.join(permutation) + s[end:]
+
+def capitalization_variants(s):
+    yield s
+    yield s.upper()
+    yield s.capitalize()
+    yield s[0].upper() + s[1:]
+    yield s[:-1] + s[-1].upper()
+
+
+def rearranged_and_number_mutated():
+    return itertools.chain.from_iterable(
+        number_mutations(base) for base in word_order_variants()
+    )
+
+
+def rearranged_number_and_case_mutated():
+    return itertools.chain.from_iterable(
+        capitalization_variants(c) for c in rearranged_and_number_mutated()
+    )
+
+def per_word_capitalization_variants(words):
+    """4 patterns ** len(words) combinations, e.g. 64 for 3 words."""
+    for combo in itertools.product(_CASE_PATTERNS, repeat=len(words)):
+        yield ''.join(fn(w) for fn, w in zip(combo, words))
+
+def per_word_order_and_case_variants(words=WORDS):
+    """Order permutation x per-word case, joined last: 6 * 64 = 384 candidates."""
+    for perm in itertools.permutations(words):
+        yield from per_word_capitalization_variants(perm)
+
+def per_word_full_mutation():
+    """... then number_mutations() on the joined string -- digit-run
+    location doesn't depend on case, so applying it after the join is fine."""
+    return itertools.chain.from_iterable(
+        number_mutations(c) for c in per_word_order_and_case_variants()
+    )
+
+
+MUTATION_PATTERNS = [
+        word_order_variants,
+        rearranged_and_number_mutated,
+        rearranged_number_and_case_mutated,
+        per_word_capitalization_variants,
+        per_word_order_and_case_variants,
+        per_word_full_mutation
+    ]
+
+def all_candidates():
+    return itertools.chain.from_iterable(fn() for fn in MUTATION_PATTERNS)
 
 def main():
 
-    #oldpassword = "aw2246french44pledgeor"
-    #ciphertextloc = "server/templates/secret.html.crypt"
+    
 
-    oldpassword = "aw2246french44pledgeor"
-    ciphertextloc = "server/templates/secret.html.crypt"
-
-    puncts = string.punctuation
-    digits = string.digits
-
-    alphabet = puncts + digits + string.ascii_letters
-
-
-
-    # oldpassword.join(t) was wrong: str.join() inserts its string BETWEEN
-    # the elements of the iterable, so e.g. "password".join(('1','2','3','4'))
-    # gives '1password2password3password4' -- three copies of oldpassword
-    # woven between the digits -- and for repeat=1 there's nothing to insert
-    # a separator between at all, so oldpassword vanishes and you just get
-    # the bare character back. "password1234" was never reachable from any
-    # of these, for any tuple. What we actually want is oldpassword as a
-    # fixed prefix, followed by the suffix characters concatenated plainly:
-    # ''.join(t) turns the tuple into a string, then + appends it after
-    # oldpassword exactly once.
-    suffix1 = (oldpassword + ''.join(t) for t in itertools.product(alphabet, repeat=5))
-    suffix2 = (oldpassword + ''.join(t) for t in itertools.product(alphabet, repeat=2))
-    suffix3 = (oldpassword + ''.join(t) for t in itertools.product(alphabet, repeat=3))
-    suffix4 = (oldpassword + ''.join(t) for t in itertools.product(alphabet, repeat=4))
-
-    total = sum(len(alphabet) ** k for k in range(1,5))
-    all_candidates = itertools.chain(suffix1, suffix2, suffix3, suffix4)
     start = time.perf_counter()
     last_print = start
     print_interval = 5  # seconds between progress prints
     count = 0
     with Pool(processes=12) as pool:
-            for result in pool.imap_unordered(decrypt_target, all_candidates, chunksize=128):
+            for result in pool.imap_unordered(decrypt_target, all_candidates(), chunksize=128):
                 #print(result)
                 count += 1
                 now = time.perf_counter()
