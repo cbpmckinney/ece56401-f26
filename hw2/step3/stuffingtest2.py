@@ -1,5 +1,6 @@
 from encrypt import decrypt
 import itertools
+import os
 from multiprocessing import Pool
 import time 
 from datetime import timedelta
@@ -48,6 +49,17 @@ def decrypt_target(password):
     return plaintext
 
 
+def pattern_count(fn):
+    """O(1) candidate count for fn if it has a closed-form .count
+    attribute attached (set right after a function's own definition --
+    see single_word_substitution_variants/two_word_substitution_variants
+    below for examples); otherwise falls back to actually enumerating
+    fn() once. New functions you add work automatically via the
+    fallback -- only worth attaching a .count once a pool is big enough
+    that enumerating it just to COUNT it becomes its own bottleneck."""
+    if hasattr(fn, "count"):
+        return fn.count()
+    return sum(1 for _ in fn())
 
 
 def word_order_variants(words=WORDS):
@@ -196,7 +208,133 @@ def per_word_full_mutation():
     )
 
 
-MUTATION_PATTERNS = [
+def whole_string_reversed_variants(words=WORDS):
+    """Every word-order permutation, each reversed end-to-end as a single
+    string -- "aw2246french44pledgor" -> "rogdelp44hcnerf6422wa", etc.
+    Different from per_word_reversed_variants() below, which reverses each
+    word in place but keeps their left-to-right order."""
+    for base in word_order_variants(words):
+        yield base[::-1]
+
+
+def per_word_reversed_variants(words=WORDS):
+    """Each word reversed individually (letters AND digits within that
+    word, since a word like "aw2246" is one token here), words themselves
+    still laid out in every order permutation -- NOT the same as reversing
+    the whole joined string above."""
+    for perm in itertools.permutations(words):
+        yield ''.join(word[::-1] for word in perm)
+
+
+def reversed_and_number_mutated():
+    """Both reversal styles, crossed with digit-run permutation (reversing
+    a word already reverses its digit run too, but number_mutations() on
+    top still explores rearranging that reversed run further)."""
+    return itertools.chain.from_iterable(
+        number_mutations(base)
+        for base in itertools.chain(whole_string_reversed_variants(), per_word_reversed_variants())
+    )
+
+
+def caesar_shift(s, shift):
+    """Shift every ALPHABETIC character by `shift` positions, wrapping
+    a->z / A->Z; digits and punctuation pass through unchanged (same
+    "case/digits don't interact" rule as exhaustive_case_variants())."""
+    out = []
+    for ch in s:
+        if ch.isalpha():
+            base = ord('a') if ch.islower() else ord('A')
+            out.append(chr((ord(ch) - base + shift) % 26 + base))
+        else:
+            out.append(ch)
+    return ''.join(out)
+
+
+def caesar_variants(words=WORDS):
+    """Every word-order permutation, run through every nontrivial Caesar
+    shift (1-25 -- shift 0 is just the plain string, already covered
+    elsewhere, no point re-testing it): 6 orders * 25 shifts = 150."""
+    for base in word_order_variants(words):
+        for shift in range(1, 26):
+            yield caesar_shift(base, shift)
+
+
+def caesar_and_number_mutated():
+    return itertools.chain.from_iterable(
+        number_mutations(c) for c in caesar_variants()
+    )
+
+
+# Length-bucketed leaked-password dictionaries from Step 2, matched to the
+# length of each of the three known words ("aw"=2, "french"=6,
+# "pledgor"=7). These let us test "same pattern (word+2246+word+44+word),
+# different actual words" without having to cross the full ~300K-word
+# dictionary against itself.
+_DICT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "step2", "dictionaries")
+
+def _load_wordlist(filename):
+    path = os.path.join(_DICT_DIR, filename)
+    with open(path, encoding="utf-8", errors="ignore") as f:
+        return [line.rstrip("\n") for line in f if line.strip()]
+
+WORDLIST_LEN2 = _load_wordlist("all_len2.txt")
+WORDLIST_LEN6 = _load_wordlist("all_len6.txt")
+WORDLIST_LEN7 = _load_wordlist("all_len7.txt")
+WORDLIST_ALL = _load_wordlist("all.txt")
+WORDLIST_COMMON = _load_wordlist("common.txt")
+
+def change_last_word():
+    for word in WORDLIST_ALL:
+        yield WORD1+WORD2+word
+
+
+def single_word_substitution_variants():
+    """Keep the "word+2246+word+44+word" PATTERN and the known digits, but
+    swap exactly ONE of the three words for a different same-length
+    candidate from the dictionaries -- the other two stay exactly as
+    cracked. Tests "Bob kept two of three words, changed one": the
+    cheapest, most behaviorally plausible version of "similar pattern,
+    not identical." 300 + 24,429 + 35,037 = 59,766 candidates."""
+    w1_known, w2_known, w3_known = BARE_WORDS
+    n1, n2 = NUMBER_PARTS
+    for w1 in WORDLIST_ALL:
+        yield f"{w1}{n1}{w2_known}{n2}{w3_known}"
+    for w2 in WORDLIST_ALL:
+        yield f"{w1_known}{n1}{w2}{n2}{w3_known}"
+    for w3 in WORDLIST_ALL:
+        yield f"{w1_known}{n1}{w2_known}{n2}{w3}"
+
+single_word_substitution_variants.count = lambda: 3 * len(WORDLIST_ALL)
+
+
+def two_word_substitution_variants():
+    """Keep exactly ONE word fixed at its known value, vary the OTHER two
+    across every combination from the length-matched dictionaries -- 3
+    ways to pick which word stays fixed:
+      fix "aw"      -> len6 x len7 =  24,429 * 35,037 ~ 855,968,673
+      fix "french"  -> len2 x len7 =     300 * 35,037 ~  10,511,100
+      fix "pledgor" -> len2 x len6 =     300 * 24,429 ~   7,328,700
+    ~874M total -- a real job (~tens of minutes at current throughput),
+    not free like single_word_substitution_variants() above."""
+    w1_known, w2_known, w3_known = BARE_WORDS
+    n1, n2 = NUMBER_PARTS
+    for w2 in WORDLIST_ALL:
+        for w3 in WORDLIST_ALL:
+            yield f"{w1_known}{n1}{w2}{n2}{w3}"
+    for w1 in WORDLIST_ALL:
+        for w3 in WORDLIST_ALL:
+            yield f"{w1}{n1}{w2_known}{n2}{w3}"
+    for w1 in WORDLIST_ALL:
+        for w2 in WORDLIST_ALL:
+            yield f"{w1}{n1}{w2}{n2}{w3_known}"
+
+two_word_substitution_variants.count = lambda: 3 * (len(WORDLIST_ALL) ** 2)
+
+
+# Already run to completion against the real ciphertext -- no hits. Kept
+# as a record so we don't accidentally re-test these (they're expensive)
+# rather than deleting the evidence we tried them.
+ALREADY_TRIED = [
         word_order_variants,
         rearranged_and_number_mutated,
         rearranged_number_and_case_mutated,
@@ -212,7 +350,18 @@ MUTATION_PATTERNS = [
         part_order_number_and_exhaustive_case,
         part_order_variants_with_separators,
         part_separated_and_number_mutated,
-        part_separated_number_and_exhaustive_case,  # most expensive -- last
+        part_separated_number_and_exhaustive_case,
+        whole_string_reversed_variants,
+        per_word_reversed_variants,
+        reversed_and_number_mutated,
+        caesar_variants,
+        caesar_and_number_mutated,
+        single_word_substitution_variants,
+        two_word_substitution_variants,  # only tested for common words
+    ]
+
+MUTATION_PATTERNS = [
+        two_word_substitution_variants,  # only tested for common words
     ]
 
 def all_candidates():
@@ -222,11 +371,13 @@ def all_candidates():
 
 def main():
 
-    start = time.perf_counter()
-    last_print = start
+    
+    
     print_interval = 5  # seconds between progress prints
     count = 0
-    total = sum(sum(1 for _ in fn()) for fn in MUTATION_PATTERNS)
+    total = sum(pattern_count(fn) for fn in MUTATION_PATTERNS)
+    start = time.perf_counter()
+    last_print = start
     print(f'Total candidates: {total}')
     with Pool(processes=12) as pool:
             for result in pool.imap_unordered(decrypt_target, all_candidates(), chunksize=128):
