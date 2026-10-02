@@ -148,13 +148,21 @@ def _build_kernel():
 
 
 def _gpu_worker(device_id, worker_id, work_queue, result_queue, stop_event,
-                 ciphertext_bytes, target_tag_bytes, threads_per_block=256):
+                 ciphertext_bytes, target_tag_bytes, batch_size, threads_per_block=256):
     """One process per GPU. Pulls prebuilt, GPU-ready batches off the
     SHARED work_queue (fed by the producer running in the main process
     -- see run_batches_multi_gpu) and dispatches them to its own CUDA
     device. Natural load balancing: whichever GPU finishes its current
     batch first just pulls the next one off the queue, rather than each
-    GPU being statically assigned a fixed half of the candidate space."""
+    GPU being statically assigned a fixed half of the candidate space.
+
+    pass_buf/out_buf are allocated ONCE (sized to `batch_size`) and
+    reused for every batch rather than cudaMalloc'd/freed each time --
+    cudaMalloc/cudaFree are synchronous driver calls, and doing two of
+    them per batch (many times a second) adds real, avoidable overhead.
+    Safe because producer_feed() in run_batches_multi_gpu() always packs
+    candidates to the same fixed MAX_PWD_LEN stride, so every batch's
+    byte layout is the same size."""
     try:
         ctx = _build_cuda_context(device_id)
     except Exception as exc:
@@ -171,6 +179,11 @@ def _gpu_worker(device_id, worker_id, work_queue, result_queue, stop_event,
         cuda.memcpy_htod(ct_buf, ct_arr)
         tag_buf = cuda.mem_alloc(tag_arr.nbytes)
         cuda.memcpy_htod(tag_buf, tag_arr)
+
+        # Preallocated ONCE and reused every batch -- see function
+        # docstring note above.
+        pass_buf = cuda.mem_alloc(batch_size * MAX_PWD_LEN)
+        out_buf = cuda.mem_alloc(batch_size)
 
         total_checked = 0
         last_report = time.perf_counter()
@@ -190,9 +203,7 @@ def _gpu_worker(device_id, worker_id, work_queue, result_queue, stop_event,
             safe_batch, packed_bytes, num_items = item
             flat_passwords = np.frombuffer(packed_bytes, dtype=np.uint8)
 
-            pass_buf = cuda.mem_alloc(flat_passwords.nbytes)
             cuda.memcpy_htod(pass_buf, flat_passwords)
-            out_buf = cuda.mem_alloc(num_items)
 
             blocks = (num_items + threads_per_block - 1) // threads_per_block
             kernel(pass_buf, np.int32(MAX_PWD_LEN),
@@ -203,8 +214,6 @@ def _gpu_worker(device_id, worker_id, work_queue, result_queue, stop_event,
 
             out_match = np.empty(num_items, dtype=np.uint8)
             cuda.memcpy_dtoh(out_match, out_buf)
-            pass_buf.free()
-            out_buf.free()
 
             total_checked += num_items
             matches = out_match == 1
@@ -249,7 +258,7 @@ def run_batches_multi_gpu(candidates, ciphertext_bytes, target_tag_bytes,
     for worker_id, device_id in enumerate(gpu_devices):
         p = MP_CTX.Process(target=_gpu_worker, args=(
             device_id, worker_id, work_queue, result_queue, stop_event,
-            ciphertext_bytes, target_tag_bytes))
+            ciphertext_bytes, target_tag_bytes, batch_size))
         workers.append(p)
         p.start()
 
@@ -313,6 +322,13 @@ def run_batches_multi_gpu(candidates, ciphertext_bytes, target_tag_bytes,
         elif kind == 'worker_error':
             worker_errors.append(msg['info']['error'])
             done_workers += 1
+            # Printed the moment it happens -- a GPU that fails to init
+            # (wrong device index, driver issue, already in use, etc.)
+            # should be visible right away, not discovered only after a
+            # multi-hour run finally ends on whatever GPU(s) survived.
+            print(f"  WARNING: GPU worker {worker_id} (device {gpu_devices[worker_id]}) "
+                  f"failed: {msg['info']['error']} -- continuing with the remaining "
+                  f"GPU(s), if any. Check `nvidia-smi -L` and this GPU's availability.")
 
         now = time.perf_counter()
         if now - last_print >= print_interval:
@@ -343,9 +359,6 @@ def run_batches_multi_gpu(candidates, ciphertext_bytes, target_tag_bytes,
             p.terminate()
             p.join(timeout=10)
 
-    if worker_errors:
-        raise RuntimeError("GPU worker(s) failed: " + "; ".join(worker_errors))
-
     combined = sum(checked_per_worker.values())
     elapsed = time.perf_counter() - start_time
     rate = combined / elapsed if elapsed > 0 else 0
@@ -360,7 +373,13 @@ def run_batches_multi_gpu(candidates, ciphertext_bytes, target_tag_bytes,
             print(f"  (warning: a GPU worker reported a match, but re-decrypting on CPU "
                   f"raised {exc!r} -- this shouldn't happen if the kernel is correct; "
                   f"investigate before trusting this result)")
+        if worker_errors:
+            print(f"  (note: found despite {len(worker_errors)} GPU worker failure(s) "
+                  f"during this run: {'; '.join(worker_errors)})")
         return found_password
+
+    if worker_errors:
+        raise RuntimeError("GPU worker(s) failed: " + "; ".join(worker_errors))
 
     print(f"FAILURE! {combined:,} checked in {elapsed:.1f}s ({rate:,.0f}/s)")
     return None

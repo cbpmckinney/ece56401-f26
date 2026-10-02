@@ -277,22 +277,45 @@ extern "C" __global__ void crack_sha256_aes_ctr(
     BYTE round_keys[15][16];
     aes256_key_expansion(key, round_keys);
 
-    // AES-256-CTR decrypt. Counter starts at integer 1 represented as a
-    // 16-byte big-endian value and increments by 1 per 16-byte block --
-    // matches encrypt.py's CTR_NONCE = (1).to_bytes(16, "big") exactly.
+    // AES-256-CTR decrypt, streamed DIRECTLY into a running SHA-256 of
+    // the plaintext (the tag) one 16-byte block at a time -- deliberately
+    // NOT materialized into one big per-thread plaintext[] buffer first
+    // (that used to be `BYTE plaintext[MAX_CT_LEN]`, i.e. 2048 bytes of
+    // per-thread storage). No GPU has anywhere near 2KB of register file
+    // per thread, so a fixed array that size forces the compiler to
+    // spill it to slow per-thread "local memory" (uncached, global-
+    // memory-backed) -- and just HAVING that much per-thread state alive
+    // craters how many threads/warps can be resident on an SM at once,
+    // independent of how little of it any single thread actually
+    // touches. This is almost certainly why a 4090 (thousands of cores)
+    // benchmarked SLOWER than an M3 Pro's integrated GPU here: NVIDIA's
+    // register-constrained architecture punishes this pattern far more
+    // than Apple's seems to. Streaming the tag update like this gives
+    // the IDENTICAL digest (SHA-256 over N bytes is the same whether
+    // it's fed in one call or in chunks) -- same trick already used for
+    // the sha256crypt kernel's digest P/C computation in step2, see that
+    // kernel's comments. `ctx` is reused from the key computation above
+    // rather than declaring a second SHA256_CTX -- sha256_ctx_init()
+    // resets it fully.
+    sha256_ctx_init(&ctx);
+
+    // Counter starts at integer 1 represented as a 16-byte big-endian
+    // value and increments by 1 per 16-byte block -- matches encrypt.py's
+    // CTR_NONCE = (1).to_bytes(16, "big") exactly.
     BYTE counter_block[16];
     for (int i = 0; i < 15; i++) counter_block[i] = 0;
     counter_block[15] = 1;
 
-    BYTE plaintext[MAX_CT_LEN];
     int off = 0;
     while (off < ct_len) {
         BYTE keystream[16];
         aes256_encrypt_block(round_keys, counter_block, keystream);
         int blocklen = (ct_len - off < 16) ? (ct_len - off) : 16;
+        BYTE block[16];
         for (int i = 0; i < blocklen; i++) {
-            plaintext[off + i] = ciphertext[off + i] ^ keystream[i];
+            block[i] = ciphertext[off + i] ^ keystream[i];
         }
+        sha256_ctx_update(&ctx, block, blocklen);
         off += 16;
         for (int i = 15; i >= 0; i--) {
             if (++counter_block[i] != 0) break;
@@ -301,8 +324,6 @@ extern "C" __global__ void crack_sha256_aes_ctr(
 
     // candidate_tag = SHA256(plaintext), compare to the real tag
     BYTE computed_tag[32];
-    sha256_ctx_init(&ctx);
-    sha256_ctx_update(&ctx, plaintext, ct_len);
     sha256_ctx_final(&ctx, computed_tag);
 
     int match = 1;
