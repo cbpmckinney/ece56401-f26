@@ -92,6 +92,8 @@ import time
 import itertools
 import multiprocessing as mp
 import queue as queue_mod
+import smtplib
+from email.message import EmailMessage
 from datetime import timedelta
 
 import numpy as np
@@ -116,6 +118,12 @@ STEP3_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # immediately, not just reported as a password string.
 sys.path.insert(0, STEP3_DIR)
 from encrypt import decrypt
+
+# Same google.key convention as ../../step2/crackconcat.py -- reused
+# directly from step2 (two lines: Gmail address, then an app password
+# for it) rather than keeping a second copy of the secret here. Covered
+# either way by the repo's "**/google.key" gitignore rule.
+GOOGLE_KEY_PATH = os.path.join(os.path.dirname(STEP3_DIR), "step2", "google.key")
 
 KERNEL_SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sha256_aes_ctr_kernel.cu")
 
@@ -156,6 +164,29 @@ def chunked_iterable(iterable, size):
         if not chunk:
             break
         yield chunk
+
+
+def send_notification(subject, body):
+    """Emails a short notification via Gmail SMTP -- same approach as
+    ../../step2/crackconcat.py's send_notification(), and identical to
+    gpu_crack_mac.py's copy of this function. Best-effort: the caller
+    wraps this in try/except so a real crack result is never lost just
+    because the email couldn't be sent (missing/stale google.key, no
+    network, etc.). Called only from the main process (never from a
+    spawned GPU worker or producer process), so there's no multiprocessing
+    concern here despite the rest of this file being multi-process."""
+    with open(GOOGLE_KEY_PATH) as keyfile:
+        keyaddr, keypass = keyfile.read().splitlines()[:2]
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = keyaddr
+    msg["To"] = keyaddr
+    msg.set_content(body)
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+        smtp.login(keyaddr, keypass)
+        smtp.send_message(msg)
 
 
 def _build_cuda_context(device_id):
@@ -572,6 +603,15 @@ def main():
     if result is not None:
         plaintext = st2.decrypt_target(result)
         print(f"Secret is: {plaintext}")
+        try:
+            send_notification(
+                "Step 3 cracker (CUDA): SUCCESS",
+                f"Password found: {result!r}\n\nDecrypted content:\n{plaintext}"
+            )
+            print("Notification email sent.")
+        except Exception as exc:
+            print(f"  (warning: password was found, but sending the notification email "
+                  f"failed: {exc!r} -- check hw2/step2/google.key)")
 
 
 if __name__ == "__main__":

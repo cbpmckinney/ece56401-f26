@@ -41,6 +41,8 @@ import itertools
 import threading
 import queue as queue_mod   # aliased: `queue` elsewhere in this file means
                               # the OpenCL command queue, not this module
+import smtplib
+from email.message import EmailMessage
 from datetime import timedelta
 
 import numpy as np
@@ -54,6 +56,12 @@ STEP3_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, STEP3_DIR)
 os.chdir(STEP3_DIR)
 import stuffingtest2 as st2
+
+# Same google.key convention as ../../step2/crackconcat.py -- reused
+# directly from step2 (two lines: Gmail address, then an app password
+# for it) rather than keeping a second copy of the secret here. Covered
+# either way by the repo's "**/google.key" gitignore rule.
+GOOGLE_KEY_PATH = os.path.join(os.path.dirname(STEP3_DIR), "step2", "google.key")
 
 KERNEL_SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sha256_aes_ctr_kernel.c")
 with open(KERNEL_SOURCE_PATH) as f:
@@ -76,6 +84,26 @@ def chunked_iterable(iterable, size):
         if not chunk:
             break
         yield chunk
+
+
+def send_notification(subject, body):
+    """Emails a short notification via Gmail SMTP -- same approach as
+    ../../step2/crackconcat.py's send_notification(). Best-effort: the
+    caller wraps this in try/except so a real crack result is never lost
+    just because the email couldn't be sent (missing/stale google.key,
+    no network, etc.)."""
+    with open(GOOGLE_KEY_PATH) as keyfile:
+        keyaddr, keypass = keyfile.read().splitlines()[:2]
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = keyaddr
+    msg["To"] = keyaddr
+    msg.set_content(body)
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+        smtp.login(keyaddr, keypass)
+        smtp.send_message(msg)
 
 
 def build_gpu_context():
@@ -325,10 +353,24 @@ def main():
 
     candidates = itertools.chain.from_iterable(fn() for fn in patterns)
     # run_batches() itself prints both the password and the decrypted
-    # content on a match (see its SUCCESS branch) -- nothing more to do
-    # here with the result.
-    run_batches(ctx, queue, kernel, candidates, ciphertext_bytes, target_tag_bytes,
-                batch_size=250000, total=total, print_interval=5)
+    # content on a match (see its SUCCESS branch); the only thing left
+    # to do with the result here is email it.
+    result = run_batches(ctx, queue, kernel, candidates, ciphertext_bytes, target_tag_bytes,
+                          batch_size=250000, total=total, print_interval=5)
+
+    if result is not None:
+        try:
+            plaintext = st2.decrypt(result, st2.ciphertext)
+            body = f"Password found: {result!r}\n\nDecrypted content:\n{plaintext}"
+        except Exception:
+            body = (f"Password found: {result!r}\n\n"
+                    f"(re-decrypting for this email failed -- see console output)")
+        try:
+            send_notification("Step 3 cracker (Mac/OpenCL): SUCCESS", body)
+            print("Notification email sent.")
+        except Exception as exc:
+            print(f"  (warning: password was found, but sending the notification email "
+                  f"failed: {exc!r} -- check hw2/step2/google.key)")
 
 
 if __name__ == "__main__":
