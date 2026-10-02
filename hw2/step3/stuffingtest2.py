@@ -1,4 +1,5 @@
 from encrypt import decrypt
+import functools
 import itertools
 import os
 from multiprocessing import Pool
@@ -329,6 +330,66 @@ def two_word_substitution_variants():
             yield f"{w1}{n1}{w2}{n2}{w3_known}"
 
 two_word_substitution_variants.count = lambda: 3 * (len(WORDLIST_ALL) ** 2)
+
+
+def two_word_substitution_shard(which_fixed, lo, hi):
+    """One contiguous slice of two_word_substitution_variants(): same 3
+    fix-one-word/vary-the-other-two branches, but the OUTER loop variable
+    of branch `which_fixed` (0="aw" fixed, 1="french" fixed, 2="pledgor"
+    fixed) is restricted to WORDLIST_ALL[lo:hi] instead of the whole
+    list. Every other branch is skipped entirely -- this is what makes a
+    set of these, one per (branch, slice) pair, a true disjoint partition
+    of the full candidate space rather than a redundant re-scan of it.
+    Built with functools.partial by two_word_substitution_shards() below;
+    not meant to be called directly."""
+    w1_known, w2_known, w3_known = BARE_WORDS
+    n1, n2 = NUMBER_PARTS
+    if which_fixed == 0:
+        for w2 in WORDLIST_ALL[lo:hi]:
+            for w3 in WORDLIST_ALL:
+                yield f"{w1_known}{n1}{w2}{n2}{w3}"
+    elif which_fixed == 1:
+        for w1 in WORDLIST_ALL[lo:hi]:
+            for w3 in WORDLIST_ALL:
+                yield f"{w1}{n1}{w2_known}{n2}{w3}"
+    else:
+        for w1 in WORDLIST_ALL[lo:hi]:
+            for w2 in WORDLIST_ALL:
+                yield f"{w1}{n1}{w2}{n2}{w3_known}"
+
+
+def two_word_substitution_shards(n_total_shards):
+    """Splits two_word_substitution_variants() into n_total_shards (or
+    fewer, if that doesn't divide evenly into >=1-sized pieces per
+    branch) independent, disjoint zero-arg generator callables --
+    together they yield EXACTLY the same multiset of strings as calling
+    two_word_substitution_variants() once, just spread across however
+    many OS processes the caller wants to run in parallel (one process
+    generating candidates in pure Python is GIL-bound, so a single
+    producer can't keep two fast GPUs fed; this is what lets candidate
+    GENERATION itself be parallelized, not just GPU dispatch). Each of
+    the 3 branches gets an equal share of the shards, and each branch's
+    own word list is cut into that many contiguous (not strided --
+    strided wouldn't reduce wall-clock generation time, only reduce
+    packing/transfer work) index-range slices. Verified against a toy
+    wordlist in /tmp/test_sharding.py: for every tested shard count, the
+    combined, sorted output of all shards exactly reproduces
+    sorted(list(two_word_substitution_variants())) with no gaps or
+    duplicates."""
+    n = len(WORDLIST_ALL)
+    per_branch = max(1, n_total_shards // 3)
+    shard_fns = []
+    for branch in range(3):
+        bounds = [round(i * n / per_branch) for i in range(per_branch + 1)]
+        for i in range(per_branch):
+            lo, hi = bounds[i], bounds[i + 1]
+            if lo == hi:
+                continue
+            shard_fns.append(functools.partial(two_word_substitution_shard, branch, lo, hi))
+    return shard_fns
+
+
+two_word_substitution_variants.make_shards = two_word_substitution_shards
 
 
 # Already run to completion against the real ciphertext -- no hits. Kept

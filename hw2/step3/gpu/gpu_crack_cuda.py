@@ -24,14 +24,28 @@ MULTI-GPU DESIGN (two RTX 4090s)
 ---------------------------------
 Generalizes gpu_crack_mac.py's single-GPU threaded producer/consumer
 overlap (added after mactop showed ~50% utilization there -- see that
-file) to multiple GPUs: ONE producer -- running in this process, never
-touching CUDA -- builds GPU-ready batches and feeds them onto a single
-shared multiprocessing.Queue; one worker PROCESS per GPU in GPU_DEVICES
-pulls from that same queue and dispatches to its own device. Whichever
-GPU finishes its current batch first just grabs the next one off the
-queue -- natural load balancing, no static up-front split of the
-candidate space the way step2's per-pattern-slice design does (that
-doesn't generalize cleanly to several differently-shaped generators).
+file) to multiple GPUs: N producer PROCESSES (one per candidate-space
+SHARD -- see NUM_PRODUCER_SHARDS and stuffingtest2.py's
+two_word_substitution_shards()) build GPU-ready batches and feed them
+onto a single shared multiprocessing.Queue; one worker PROCESS per GPU
+in GPU_DEVICES pulls from that same queue and dispatches to its own
+device. Whichever GPU finishes its current batch first just grabs the
+next one off the queue -- natural load balancing, no static up-front
+split of the candidate space the way step2's per-pattern-slice design
+does (that doesn't generalize cleanly to several differently-shaped
+generators); the sharding happens one level up, on the GENERATION side.
+
+Earlier version of this file used a SINGLE producer thread instead of N
+producer processes. That was fine as long as the GPU was the
+bottleneck, but once the kernel occupancy fix made per-candidate GPU
+work cheap, one GIL-bound Python thread could no longer generate+pack
+candidates fast enough to keep two fast GPUs fed -- visible in nvtop as
+both GPUs "working" but mostly idle. True parallelism for pure-Python
+candidate generation requires separate OS processes, not threads (the
+GIL serializes CPU-bound bytecode across threads in one process), so
+generation itself now also runs as N processes, each over a disjoint
+slice of the candidate space (see two_word_substitution_shards()'s
+docstring for how a slice is carved out without redundant overlap).
 
 Each GPU is driven by its own spawned OS PROCESS, not a thread -- this is
 a hard CUDA requirement, not a style choice (see gpu_nvidia_cuda.py's
@@ -76,7 +90,6 @@ import os
 import sys
 import time
 import itertools
-import threading
 import multiprocessing as mp
 import queue as queue_mod
 from datetime import timedelta
@@ -115,6 +128,21 @@ GPU_DEVICES = [0, 1]
 
 # Same flag/meaning as gpu_crack_mac.py.
 INCLUDE_ALREADY_TRIED = False
+
+# How many independent producer PROCESSES to split EACH shardable
+# pattern into (see stuffingtest2.py's two_word_substitution_shards()).
+# A single producer thread is GIL-bound pure-Python string formatting --
+# fine when the GPU itself is the bottleneck, but once the kernel is
+# fast enough (two RTX 4090s after the occupancy fix), one producer
+# can't generate+pack candidates fast enough to keep both fed (this is
+# what "both GPUs sitting mostly idle" in nvtop means). Pick a number
+# that leaves headroom for the main process (draining results/
+# printing) and the len(GPU_DEVICES) GPU worker processes -- e.g. on a
+# machine with 16+ logical cores, 8-12 is a reasonable starting point;
+# tune against htop/nvtop together (CPU cores pegged but GPUs still
+# idle => raise this; CPU maxed out and GPUs now busy => you've found
+# the balance).
+NUM_PRODUCER_SHARDS = 8
 
 # Explicit spawn context -- required so worker processes get a fresh
 # interpreter (no inherited CUDA state) instead of a fork() copy.
@@ -160,9 +188,9 @@ def _gpu_worker(device_id, worker_id, work_queue, result_queue, stop_event,
     reused for every batch rather than cudaMalloc'd/freed each time --
     cudaMalloc/cudaFree are synchronous driver calls, and doing two of
     them per batch (many times a second) adds real, avoidable overhead.
-    Safe because producer_feed() in run_batches_multi_gpu() always packs
-    candidates to the same fixed MAX_PWD_LEN stride, so every batch's
-    byte layout is the same size."""
+    Safe because _producer_process() always packs candidates to the
+    same fixed MAX_PWD_LEN stride, so every batch's byte layout is the
+    same size."""
     try:
         ctx = _build_cuda_context(device_id)
     except Exception as exc:
@@ -237,16 +265,66 @@ def _gpu_worker(device_id, worker_id, work_queue, result_queue, stop_event,
         ctx.pop()
 
 
-def run_batches_multi_gpu(candidates, ciphertext_bytes, target_tag_bytes,
+def _producer_process(shard_fn, batch_size, work_queue, stop_event,
+                       producers_remaining, producers_lock):
+    """One process per candidate-space shard (see NUM_PRODUCER_SHARDS).
+    Generates+packs batches from its own disjoint shard and feeds them
+    onto the SAME shared work_queue the GPU worker processes already
+    pull from -- this is purely about parallelizing candidate
+    GENERATION across CPU cores (previously one GIL-bound thread),
+    independent of which GPU ends up dispatching a given batch.
+
+    Sentinel handling: N independent producer processes finish at
+    different times, but exactly ONE None must reach the queue once ALL
+    of them are done -- pushing one per producer would interleave
+    sentinels with real batches and make a GPU worker stop early while
+    candidates from a slower producer remain unsent. producers_remaining
+    (a shared Value, decremented under producers_lock) tracks how many
+    producers are still running; only the one that brings it to 0 pushes
+    the sentinel, and only if the search wasn't already stopped early by
+    a match (stop_event)."""
+    for candidate_batch in chunked_iterable(shard_fn(), batch_size):
+        if stop_event.is_set():
+            break
+        safe_batch = [c for c in candidate_batch if len(c) <= MAX_PWD_LEN]
+        if not safe_batch:
+            continue
+        packed = b''.join(
+            cand.encode("ascii").ljust(MAX_PWD_LEN, b'\x00')
+            for cand in safe_batch
+        )
+        while not stop_event.is_set():
+            try:
+                work_queue.put((safe_batch, packed, len(safe_batch)), timeout=1)
+                break
+            except queue_mod.Full:
+                continue
+
+    with producers_lock:
+        producers_remaining.value -= 1
+        is_last_producer = producers_remaining.value == 0
+
+    if is_last_producer and not stop_event.is_set():
+        work_queue.put(None)
+
+
+def run_batches_multi_gpu(candidate_shards, ciphertext_bytes, target_tag_bytes,
                            gpu_devices=None, batch_size=500000,
                            total=None, print_interval=5, lookahead_per_gpu=3):
-    """candidates: an iterable of password-guess strings. Returns the
-    matching password (str) and stops early, or None once candidates is
-    exhausted with no match across every GPU.
+    """candidate_shards: a list of zero-arg callables, each returning an
+    independent iterator over a DISJOINT slice of the password-guess
+    space (see stuffingtest2.py's *_shards() helpers, and main() below
+    for how a non-shardable pattern just becomes a list of one).
+    Returns the matching password (str) and stops early, or None once
+    every shard is exhausted with no match across every GPU.
 
-    See module docstring for the overall design: one producer thread
-    (right here, CPU-only) feeding a shared queue that N per-GPU worker
-    processes consume from."""
+    See module docstring for the overall design: ONE PRODUCER PROCESS
+    PER SHARD (CPU-only, no CUDA) feeds a single shared queue that N
+    per-GPU worker processes consume from. This replaced an earlier
+    single-threaded producer, which was GIL-bound and -- once the
+    kernel's occupancy fix made per-candidate GPU work cheap -- couldn't
+    generate+pack candidates fast enough to keep two GPUs fed (visible
+    in nvtop as both GPUs sitting mostly idle despite "working")."""
     if gpu_devices is None:
         gpu_devices = GPU_DEVICES
 
@@ -262,31 +340,15 @@ def run_batches_multi_gpu(candidates, ciphertext_bytes, target_tag_bytes,
         workers.append(p)
         p.start()
 
-    def producer_feed():
-        """Builds batches and feeds work_queue; stops feeding as soon as
-        stop_event is set (a worker found the match) instead of racing
-        to finish generating the whole remaining candidate space."""
-        for candidate_batch in chunked_iterable(candidates, batch_size):
-            if stop_event.is_set():
-                return
-            safe_batch = [c for c in candidate_batch if len(c) <= MAX_PWD_LEN]
-            if not safe_batch:
-                continue
-            packed = b''.join(
-                cand.encode("ascii").ljust(MAX_PWD_LEN, b'\x00')
-                for cand in safe_batch
-            )
-            while not stop_event.is_set():
-                try:
-                    work_queue.put((safe_batch, packed, len(safe_batch)), timeout=1)
-                    break
-                except queue_mod.Full:
-                    continue
-        if not stop_event.is_set():
-            work_queue.put(None)
-
-    producer_thread = threading.Thread(target=producer_feed, daemon=True)
-    producer_thread.start()
+    producers_remaining = MP_CTX.Value('i', len(candidate_shards))
+    producers_lock = MP_CTX.Lock()
+    producers = []
+    for shard_fn in candidate_shards:
+        p = MP_CTX.Process(target=_producer_process, args=(
+            shard_fn, batch_size, work_queue, stop_event,
+            producers_remaining, producers_lock))
+        producers.append(p)
+        p.start()
 
     checked_per_worker = {i: 0 for i in range(len(gpu_devices))}
     found_password = None
@@ -348,10 +410,15 @@ def run_batches_multi_gpu(candidates, ciphertext_bytes, target_tag_bytes,
             last_print = now
 
     # In case something ended abnormally (e.g. worker_error) without a
-    # 'found' message, make sure the producer isn't left blocked forever
-    # on a full queue.
+    # 'found' message, make sure no producer is left blocked forever on
+    # a full queue.
     stop_event.set()
-    producer_thread.join(timeout=5)
+
+    for p in producers:
+        p.join(timeout=30)
+        if p.is_alive():
+            p.terminate()
+            p.join(timeout=10)
 
     for p in workers:
         p.join(timeout=30)
@@ -481,11 +548,25 @@ def main():
     total = sum(st2.pattern_count(fn) for fn in patterns)
     print(f"Total candidates: {total}")
 
-    candidates = itertools.chain.from_iterable(fn() for fn in patterns)
+    # Shard every pattern that opts in (has .make_shards -- currently
+    # just two_word_substitution_variants) into NUM_PRODUCER_SHARDS
+    # independent producer-process shards; a pattern without
+    # .make_shards just becomes a single-shard list of itself, so it
+    # still gets its own producer process (no change in behavior for
+    # small/cheap patterns, just no parallel generation benefit).
+    candidate_shards = []
+    for fn in patterns:
+        if hasattr(fn, "make_shards"):
+            candidate_shards.extend(fn.make_shards(NUM_PRODUCER_SHARDS))
+        else:
+            candidate_shards.append(fn)
+    print(f"Split into {len(candidate_shards)} producer-process shard(s) "
+          f"(NUM_PRODUCER_SHARDS={NUM_PRODUCER_SHARDS}) across {len(patterns)} pattern pool(s)")
+
     ciphertext_bytes = st2.ciphertext[:-32]
     target_tag_bytes = st2.ciphertext[-32:]
 
-    result = run_batches_multi_gpu(candidates, ciphertext_bytes, target_tag_bytes,
+    result = run_batches_multi_gpu(candidate_shards, ciphertext_bytes, target_tag_bytes,
                                     gpu_devices=GPU_DEVICES, total=total)
 
     if result is not None:
