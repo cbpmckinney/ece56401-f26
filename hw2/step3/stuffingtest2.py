@@ -2,6 +2,7 @@ from encrypt import decrypt
 import functools
 import itertools
 import os
+import sys
 from multiprocessing import Pool
 import time 
 from datetime import timedelta
@@ -429,6 +430,47 @@ def all_candidates():
     return itertools.chain.from_iterable(fn() for fn in MUTATION_PATTERNS)
 
 
+def write_exemplars(path="exemplars.txt", n_per_pattern=10, patterns=None):
+    """Writes a small, human-readable sample of candidates from EACH
+    pattern category to `path` -- one password per line, grouped under a
+    '## function_name' header per category -- so you can eyeball that
+    every pattern is actually producing the shape of candidate you
+    expect before spending real GPU time running it.
+
+    Defaults to ALREADY_TRIED rather than MUTATION_PATTERNS: MUTATION_
+    PATTERNS is just whichever pattern(s) are currently ACTIVE (one,
+    right now -- two_word_substitution_variants), while ALREADY_TRIED
+    is the full catalog of every named mutation category this file
+    defines (and already includes two_word_substitution_variants too,
+    so nothing is duplicated or missed by using it instead). Pass an
+    explicit `patterns` list to sample something else instead -- e.g.
+    patterns=MUTATION_PATTERNS for just the active one(s), or
+    patterns=ALREADY_TRIED + MUTATION_PATTERNS for literally everything
+    (redundant today since MUTATION_PATTERNS is already a subset of
+    ALREADY_TRIED, but future-proof if that ever stops being true).
+
+    Each generator is only pulled from lazily via itertools.islice, so
+    even a multi-hundred-million-candidate pattern like
+    two_word_substitution_variants costs nothing extra here -- it's
+    never fully enumerated, just asked for its first n_per_pattern
+    items."""
+    if patterns is None:
+        patterns = ALREADY_TRIED
+
+    with open(path, "w", encoding="utf-8") as f:
+        for fn in patterns:
+            f.write(f"## {fn.__name__}\n")
+            n_written = 0
+            for cand in itertools.islice(fn(), n_per_pattern):
+                f.write(cand + "\n")
+                n_written += 1
+            if n_written == 0:
+                f.write("(no candidates produced)\n")
+            f.write("\n")
+
+    print(f"Wrote exemplars for {len(patterns)} pattern categor"
+          f"{'y' if len(patterns) == 1 else 'ies'} (up to {n_per_pattern} each) to {path!r}.")
+
 
 def main():
 
@@ -472,4 +514,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    if "--exemplars" in sys.argv:
+        write_exemplars()
+    else:
+        main()
