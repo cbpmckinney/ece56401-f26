@@ -14,7 +14,7 @@ machine, following the same host-side conventions already proven in
 
 MAIN() STRUCTURE IS DELIBERATELY KEPT LIKE gpu_crack_mac.py's: it still
 just imports MUTATION_PATTERNS/pattern_count/ciphertext straight from
-stuffingtest2.py and chains them into one candidate stream -- NOT step2's
+stuffingonline2.py and chains them into one candidate stream -- NOT step2's
 elaborate per-pattern pool-splitting/resume-log/email-notification
 design, which doesn't fit here (MUTATION_PATTERNS is several
 differently-shaped generators chained together, not one big clean
@@ -25,7 +25,7 @@ MULTI-GPU DESIGN (two RTX 4090s)
 Generalizes gpu_crack_mac.py's single-GPU threaded producer/consumer
 overlap (added after mactop showed ~50% utilization there -- see that
 file) to multiple GPUs: N producer PROCESSES (one per candidate-space
-SHARD -- see NUM_PRODUCER_SHARDS and stuffingtest2.py's
+SHARD -- see NUM_PRODUCER_SHARDS and stuffingonline2.py's
 two_word_substitution_shards()) build GPU-ready batches and feed them
 onto a single shared multiprocessing.Queue; one worker PROCESS per GPU
 in GPU_DEVICES pulls from that same queue and dispatches to its own
@@ -85,7 +85,7 @@ docstring): CUDA contexts must NOT be inherited across fork(), so this
 uses multiprocessing.get_context('spawn'), never imports pycuda.autoinit
 at module level, and every function that touches the GPU creates its own
 context explicitly with cuda.init() / cuda.Device(N).make_context() /
-ctx.pop(). stuffingtest2.py is intentionally NOT imported at module
+ctx.pop(). stuffingonline2.py is intentionally NOT imported at module
 level (only main() needs it) -- this module gets re-imported from
 scratch in every spawned worker process, and the workers never touch
 st2's ~300K-line dictionaries, so importing it up here would mean every
@@ -153,7 +153,7 @@ except ImportError:
     )
 
 STEP3_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# NOTE: stuffingtest2 is intentionally NOT imported here at module level
+# NOTE: stuffingonline2 is intentionally NOT imported here at module level
 # -- see the module docstring. Only main() imports it, after this
 # process is confirmed to be the real entry point (not a spawned CUDA
 # worker, which never needs it). encrypt.py is different: it's just the
@@ -183,7 +183,7 @@ GPU_DEVICES = [0, 1]
 INCLUDE_ALREADY_TRIED = False
 
 # How many independent producer PROCESSES to split EACH shardable
-# pattern into (see stuffingtest2.py's two_word_substitution_shards()).
+# pattern into (see stuffingonline2.py's two_word_substitution_shards()).
 # A single producer thread is GIL-bound pure-Python string formatting --
 # fine when the GPU itself is the bottleneck, but once the kernel is
 # fast enough (two RTX 4090s after the occupancy fix), one producer
@@ -455,7 +455,7 @@ def run_batches_multi_gpu(candidate_shards, ciphertext_bytes, target_tag_bytes,
                            total=None, print_interval=5, lookahead_per_gpu=3):
     """candidate_shards: a list of zero-arg callables, each returning an
     independent iterator over a DISJOINT slice of the password-guess
-    space (see stuffingtest2.py's *_shards() helpers, and main() below
+    space (see stuffingonline2.py's *_shards() helpers, and main() below
     for how a non-shardable pattern just becomes a list of one).
     Returns the matching password (str) and stops early, or None once
     every shard is exhausted with no match across every GPU.
@@ -712,7 +712,7 @@ def test_known_password():
 def main():
     sys.path.insert(0, STEP3_DIR)
     os.chdir(STEP3_DIR)
-    import stuffingtest2 as st2
+    import stuffingonline2 as st2
 
     patterns = list(st2.MUTATION_PATTERNS)
     if INCLUDE_ALREADY_TRIED:

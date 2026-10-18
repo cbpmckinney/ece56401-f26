@@ -397,6 +397,11 @@ two_word_substitution_variants.make_shards = two_word_substitution_shards
 # as a record so we don't accidentally re-test these (they're expensive)
 # rather than deleting the evidence we tried them.
 ALREADY_TRIED = [
+        
+    ]
+
+MUTATION_PATTERNS = [
+        two_word_substitution_variants,  # only tested for common words
         word_order_variants,
         rearranged_and_number_mutated,
         rearranged_number_and_case_mutated,
@@ -419,10 +424,6 @@ ALREADY_TRIED = [
         caesar_variants,
         caesar_and_number_mutated,
         single_word_substitution_variants,
-        two_word_substitution_variants,  # only tested for common words
-    ]
-
-MUTATION_PATTERNS = [
         two_word_substitution_variants,  # only tested for common words
     ]
 

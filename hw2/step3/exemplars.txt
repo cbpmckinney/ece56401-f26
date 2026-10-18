@@ -8,15 +8,15 @@ pledgorfrench44aw2246
 
 ## rearranged_and_number_mutated
 aw2246french44pledgor
-aw2624french44pledgor
 aw2264french44pledgor
+aw2642french44pledgor
+aw4226french44pledgor
+aw6242french44pledgor
+aw4622french44pledgor
+aw6422french44pledgor
 aw2462french44pledgor
 aw4262french44pledgor
-aw2426french44pledgor
-aw4226french44pledgor
-aw2246french44pledgor
 aw6224french44pledgor
-aw2642french44pledgor
 
 ## rearranged_number_and_case_mutated
 aw2246french44pledgor
@@ -24,11 +24,11 @@ AW2246FRENCH44PLEDGOR
 Aw2246french44pledgor
 Aw2246french44pledgor
 aw2246french44pledgoR
-aw2624french44pledgor
-AW2624FRENCH44PLEDGOR
-Aw2624french44pledgor
-Aw2624french44pledgor
-aw2624french44pledgoR
+aw2264french44pledgor
+AW2264FRENCH44PLEDGOR
+Aw2264french44pledgor
+Aw2264french44pledgor
+aw2264french44pledgoR
 
 ## per_word_capitalization_variants
 AW2246FRENCH44PLEDGOR
@@ -56,15 +56,15 @@ AW2246French44pledgor
 
 ## per_word_full_mutation
 AW2246FRENCH44PLEDGOR
-AW2624FRENCH44PLEDGOR
 AW2264FRENCH44PLEDGOR
+AW2642FRENCH44PLEDGOR
+AW4226FRENCH44PLEDGOR
+AW6242FRENCH44PLEDGOR
+AW4622FRENCH44PLEDGOR
+AW6422FRENCH44PLEDGOR
 AW2462FRENCH44PLEDGOR
 AW4262FRENCH44PLEDGOR
-AW2426FRENCH44PLEDGOR
-AW4226FRENCH44PLEDGOR
-AW2246FRENCH44PLEDGOR
 AW6224FRENCH44PLEDGOR
-AW2642FRENCH44PLEDGOR
 
 ## rearranged_number_and_exhaustive_case
 aw2246french44pledgor
@@ -92,15 +92,15 @@ aw2246$pledgor$french44
 
 ## separated_and_number_mutated
 aw2246-french44-pledgor
-aw2624-french44-pledgor
 aw2264-french44-pledgor
+aw2642-french44-pledgor
+aw4226-french44-pledgor
+aw6242-french44-pledgor
+aw4622-french44-pledgor
+aw6422-french44-pledgor
 aw2462-french44-pledgor
 aw4262-french44-pledgor
-aw2426-french44-pledgor
-aw4226-french44-pledgor
-aw2246-french44-pledgor
 aw6224-french44-pledgor
-aw2642-french44-pledgor
 
 ## separated_number_and_exhaustive_case
 aw2246-french44-pledgor
@@ -128,15 +128,15 @@ awpledgor224644french
 
 ## part_order_and_number_mutated
 awfrenchpledgor224644
-awfrenchpledgor244426
-awfrenchpledgor244642
-awfrenchpledgor644242
-awfrenchpledgor446242
-awfrenchpledgor262444
-awfrenchpledgor442264
+awfrenchpledgor246244
+awfrenchpledgor424426
+awfrenchpledgor446422
 awfrenchpledgor244624
-awfrenchpledgor644224
-awfrenchpledgor442246
+awfrenchpledgor264244
+awfrenchpledgor442642
+awfrenchpledgor244426
+awfrenchpledgor462244
+awfrenchpledgor262444
 
 ## part_order_number_and_exhaustive_case
 awfrenchpledgor224644
@@ -164,15 +164,15 @@ aw$french$pledgor$44$2246
 
 ## part_separated_and_number_mutated
 aw-french-pledgor-2246-44
-aw-french-pledgor-2624-44
 aw-french-pledgor-2264-44
+aw-french-pledgor-2642-44
+aw-french-pledgor-4226-44
+aw-french-pledgor-6242-44
+aw-french-pledgor-4622-44
+aw-french-pledgor-6422-44
 aw-french-pledgor-2462-44
 aw-french-pledgor-4262-44
-aw-french-pledgor-2426-44
-aw-french-pledgor-4226-44
-aw-french-pledgor-2246-44
 aw-french-pledgor-6224-44
-aw-french-pledgor-2642-44
 
 ## part_separated_number_and_exhaustive_case
 aw-french-pledgor-2246-44
@@ -205,14 +205,14 @@ rogdelp44hcnerf6422wa
 ## reversed_and_number_mutated
 rogdelp44hcnerf6422wa
 rogdelp44hcnerf6422wa
-rogdelp44hcnerf2624wa
 rogdelp44hcnerf2264wa
-rogdelp44hcnerf2462wa
-rogdelp44hcnerf4262wa
-rogdelp44hcnerf2426wa
+rogdelp44hcnerf6422wa
+rogdelp44hcnerf6242wa
 rogdelp44hcnerf4226wa
+rogdelp44hcnerf4622wa
+rogdelp44hcnerf2642wa
+rogdelp44hcnerf4262wa
 rogdelp44hcnerf6224wa
-rogdelp44hcnerf2246wa
 
 ## caesar_variants
 bx2246gsfodi44qmfehps
@@ -228,15 +228,15 @@ kg2246pboxmr44zvonqyb
 
 ## caesar_and_number_mutated
 bx2246gsfodi44qmfehps
-bx2624gsfodi44qmfehps
 bx2264gsfodi44qmfehps
+bx2642gsfodi44qmfehps
+bx4226gsfodi44qmfehps
+bx6242gsfodi44qmfehps
+bx4622gsfodi44qmfehps
+bx6422gsfodi44qmfehps
 bx2462gsfodi44qmfehps
 bx4262gsfodi44qmfehps
-bx2426gsfodi44qmfehps
-bx4226gsfodi44qmfehps
-bx2246gsfodi44qmfehps
 bx6224gsfodi44qmfehps
-bx2642gsfodi44qmfehps
 
 ## single_word_substitution_variants
 123452246french44pledgor

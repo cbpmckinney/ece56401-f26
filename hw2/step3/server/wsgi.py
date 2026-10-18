@@ -18,7 +18,6 @@ def decrypt_view():
     try:
         plaintext = decrypt(password, ciphertext)
     except Exception as e:
-        print(f"Password given was {password}")
         abort(403)
     return plaintext
 

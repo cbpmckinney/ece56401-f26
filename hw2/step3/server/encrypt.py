@@ -3,13 +3,7 @@ import pyaes
 import hashlib
 
 def derive_key(password):
-    # password may arrive as str (a typed-in password, or plaintext read
-    # from a text-mode file) or as bytes (e.g. compute_tag() is called on
-    # the *output* of aes.decrypt(), which pyaes always returns as bytes).
-    # Only str needs encoding -- bytes is already what hashlib wants.
-    if isinstance(password, str):
-        password = password.encode("ascii")
-    return hashlib.sha256(password).digest()
+    return hashlib.sha256(password.encode("ascii")).digest()
 
 def compute_tag(plaintext):
 
@@ -35,22 +29,14 @@ def decrypt(password, ciphertext):
     aes = pyaes.AESModeOfOperationCTR(key)
     decrypted = aes.decrypt(ciphertext)
     try:
-        # Both tag and newtag are raw 32-byte SHA-256 digests -- compare
-        # them as bytes directly. (The old code called .decode("utf-8") on
-        # a digest, which is essentially random bytes and almost never
-        # valid UTF-8; that's what was raising the "wrong password or
-        # malformed payload!" exception even for the RIGHT password.)
-        newtag = compute_tag(decrypted)
-    except Exception:
+        newtag = compute_tag(decrypted.decode("ascii"))
+    except:
         raise Exception("wrong password or malformed payload!")
     if newtag != tag:
         raise Exception("tag doesn't match! {}, {}".format(tag, newtag))
 
 
-    # decrypted is bytes (that's what aes.decrypt() returns); decode back
-    # to str so it matches the type of the plaintext that was originally
-    # encrypted (encrypt() accepts str and pyaes encodes it internally).
-    return decrypted.decode("utf-8")
+    return decrypted
 
 if __name__ == "__main__":
     import sys
