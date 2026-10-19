@@ -528,8 +528,15 @@ def number_value_variants():
                 yield cand
 
 
-_LEET_MAP = {"a": "@", "e": "3", "o": "0", "l": "1", "g": "9",
-             "s": "$", "i": "1", "t": "7", "b": "8"}
+# Each letter -> its common leet symbol options (first = canonical,
+# used by the type-global leet_variants). Enriched after the thin
+# a/e/o/l/g map missed c and h (both in "french") and all alternates.
+_LEET_OPTIONS = {
+    "a": ["@", "4"], "b": ["8"], "c": ["(", "<"], "e": ["3"],
+    "g": ["9", "6"], "h": ["#"], "i": ["1", "!"], "l": ["1", "!"],
+    "o": ["0"], "s": ["$", "5"], "t": ["7", "+"], "z": ["2"],
+}
+_LEET_MAP = {k: v[0] for k, v in _LEET_OPTIONS.items()}
 
 def leet_variants():
     """Every subset of leet substitutions on OLDPASSWORD: each
@@ -570,6 +577,118 @@ def number_bruteforce_both():
         r1 = str(v1).zfill(w1)
         for v2 in range(10 ** w2):
             yield pre + r1 + mid + str(v2).zfill(w2) + post
+
+
+# ---------------------------------------------------------------------
+# "Two edits of the SAME KIND at two DIFFERENT locations" (professor's
+# refined hint). Everything else applies an edit once / at the ends /
+# globally-by-type; these apply one positional single-char edit at every
+# PAIR of applicable positions. Two-letter CASE changes are already
+# covered by the exhaustive-case pools, and both-number changes by
+# number_bruteforce_both, so those kinds are not repeated here.
+# ---------------------------------------------------------------------
+
+_INSERT_CHARS = "0123456789!@#$%._-"
+
+def _leetable_positions(s):
+    return [i for i, ch in enumerate(s) if ch.lower() in _LEET_MAP]
+
+def leet_two_positions():
+    """Leet exactly TWO characters of OLDPASSWORD -- every pair of leetable
+    positions, every symbol option for each (a->@/4, g->9/6, c->(/<, h->#,
+    ...). Unlike leet_variants, which replaces a letter TYPE everywhere.
+    Enriched map: c and h are leetable now, plus alternate symbols."""
+    s = OLDPASSWORD
+    seen = set()
+    for i, j in itertools.combinations(_leetable_positions(s), 2):
+        for si in _LEET_OPTIONS[s[i].lower()]:
+            for sj in _LEET_OPTIONS[s[j].lower()]:
+                chars = list(s)
+                chars[i] = si
+                chars[j] = sj
+                cand = "".join(chars)
+                if cand not in seen:
+                    seen.add(cand); yield cand
+
+def transpose_two_positions():
+    """Swap each of TWO different adjacent character pairs. C(len-1, 2)."""
+    s = OLDPASSWORD
+    seen = set()
+    for a, b in itertools.combinations(range(len(s) - 1), 2):
+        chars = list(s)
+        chars[a], chars[a+1] = chars[a+1], chars[a]
+        chars[b], chars[b+1] = chars[b+1], chars[b]
+        cand = "".join(chars)
+        if cand != s and cand not in seen:
+            seen.add(cand); yield cand
+
+def delete_two_positions():
+    """Delete TWO characters, every pair of positions. C(len, 2)."""
+    s = OLDPASSWORD
+    seen = set()
+    for i, j in itertools.combinations(range(len(s)), 2):
+        cand = "".join(ch for k, ch in enumerate(s) if k != i and k != j)
+        if cand not in seen:
+            seen.add(cand); yield cand
+
+def duplicate_two_positions():
+    """Double TWO characters, every pair of positions. C(len, 2)."""
+    s = OLDPASSWORD
+    seen = set()
+    for i, j in itertools.combinations(range(len(s)), 2):
+        chars = list(s)
+        for k in sorted((i, j), reverse=True):
+            chars.insert(k + 1, chars[k])
+        cand = "".join(chars)
+        if cand not in seen:
+            seen.add(cand); yield cand
+
+def insert_two_positions():
+    """Insert the SAME character at two different gaps, for each char in a
+    small insert set. C(len+1, 2) gap-pairs x len(_INSERT_CHARS)."""
+    s = OLDPASSWORD
+    n = len(s)
+    seen = set()
+    for ch in _INSERT_CHARS:
+        for i, j in itertools.combinations(range(n + 1), 2):
+            chars = list(s)
+            chars.insert(j, ch)   # higher gap first so i stays valid
+            chars.insert(i, ch)
+            cand = "".join(chars)
+            if cand not in seen:
+                seen.add(cand); yield cand
+
+
+def reverse_two_words():
+    """Reverse exactly TWO of the three bare words in place (letters only;
+    the numbers stay put). per_word_reversed_variants reversed ALL words
+    as fused word+number blocks, never 'exactly two bare words'. C(3,2)=3."""
+    spans = [(mt.start(), mt.end()) for mt in re.finditer(r'[A-Za-z]+', OLDPASSWORD)]
+    seen = set()
+    for a, b in itertools.combinations(range(len(spans)), 2):
+        chars = list(OLDPASSWORD)
+        for st, en in (spans[a], spans[b]):
+            chars[st:en] = list(OLDPASSWORD[st:en][::-1])
+        cand = "".join(chars)
+        if cand != OLDPASSWORD and cand not in seen:
+            seen.add(cand); yield cand
+
+
+def grow_both_numbers():
+    """Grow BOTH number runs by one digit (same kind -- 'add a digit to a
+    number' -- at two locations). number_bruteforce_both held the widths
+    fixed, so these length-changing edits are new. append-to-both (10x10)
+    + prepend-to-both (10x10) = 200."""
+    runs = list(digit_runs(OLDPASSWORD))
+    (s1, e1, _), (s2, e2, _) = runs[0], runs[1]
+    seen = set()
+    for d1 in "0123456789":
+        for d2 in "0123456789":
+            app = OLDPASSWORD[:e1] + d1 + OLDPASSWORD[e1:e2] + d2 + OLDPASSWORD[e2:]
+            pre = OLDPASSWORD[:s1] + d1 + OLDPASSWORD[s1:s2] + d2 + OLDPASSWORD[s2:]
+            for cand in (app, pre):
+                if cand not in seen:
+                    seen.add(cand); yield cand
 
 
 # Closed-form candidate counts for the pools that would otherwise be
@@ -635,6 +754,18 @@ ALREADY_TRIED = [
         separated_number_and_exhaustive_case,
         part_order_number_and_exhaustive_case,
         part_separated_number_and_exhaustive_case,
+        # single trivial edits + exhaustive number replacement
+        # (2nd full sweep after the pledgeor fix -- no hit)
+        leet_variants,
+        number_value_variants,
+        append_prepend_common_tokens,
+        number_bruteforce_single,
+        number_bruteforce_both,
+        # two-location char edits (fully exhausted online, no hit)
+        transpose_two_positions,
+        delete_two_positions,
+        duplicate_two_positions,
+        insert_two_positions,
     ]
 
 # EVERYTHING, re-ordered cheapest-first so trivial hits surface quickly
@@ -648,19 +779,26 @@ ALREADY_TRIED = [
 # single-edit + number pools are tiny (seconds, even online);
 # two_word_substitution_variants is the lone monster and never finished,
 # so it stays last.
+# TWO edits of the SAME KIND at two DIFFERENT locations (professor's
+# refined hint). The char-level kinds we fully exhausted online
+# (transpose/delete/duplicate/insert) and the ones covered elsewhere
+# (2-letter CASE via exhaustive-case, both-number via number_bruteforce_both)
+# are all in ALREADY_TRIED now. What's left here: (1) positional leet
+# RE-RUN with an enriched symbol map -- the first pass used a thin
+# a/e/o/l/g map, one symbol each, and missed c, h and all alternates
+# (a4 g6 h# c( ...); (2) token-level same-kind edits earlier pools never
+# isolated. ~350 candidates, ~1s online.
 MUTATION_PATTERNS = [
-        # ---- single trivial edits of the old password ----
-        leet_variants,                             # 32      (a@ e3 o0 l1 g9 ...)
-        number_value_variants,                     # 132     (bump / year / common number)
-        append_prepend_common_tokens,              # 236     (years, 4+ char suffixes, +cap)
-
-        # ---- exhaustive number replacement ----
-        number_bruteforce_single,                  # 10,100     (each run -> every same-width value)
-        number_bruteforce_both,                    # 1,000,000  (both runs -> every combination)
-
-        # ---- the one still-open monster from the first sweep ----
-        two_word_substitution_variants,            # 269,865,016,875  (GPU-only, overnight)
+        leet_two_positions,        # ~150  (leet 2 chars, ENRICHED map: +c +h +alt symbols)
+        reverse_two_words,         # 3     (reverse 2 of the 3 bare words in place)
+        grow_both_numbers,         # 200   (add a digit to BOTH numbers, append/prepend)
     ]
+
+# PARKED (deliberately NOT in MUTATION_PATTERNS): two whole-word dictionary
+# swaps is a valid "same-kind x 2-location" edit, but at ~270B it's a
+# GPU-only overnight grind, out of scope for the online 400/s approach the
+# professor assumes. The generator is still defined above -- re-add
+# two_word_substitution_variants to MUTATION_PATTERNS to grind it on GPU.
 
 def all_candidates():
     return itertools.chain.from_iterable(fn() for fn in MUTATION_PATTERNS)
