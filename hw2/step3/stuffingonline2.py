@@ -12,7 +12,7 @@ import requests
 
 
 # GLOBAL DATA
-url = "http://127.0.0.1:5000/decrypt"
+url = "http://127.0.0.1:8080/decrypt"
 
 # Offline crypto helpers. This module's own main() cracks via the Flask
 # server (check_password_online() below); the GPU offline crackers in
@@ -725,6 +725,8 @@ number_bruteforce_both.count = lambda: 10 ** len(_NUM_RUNS[0][2]) * 10 ** len(_N
 # at ~270B it never finished, so it stays open in MUTATION_PATTERNS.)
 ALREADY_TRIED = [
         # tiny structural / case
+
+        # ~1M
         word_order_variants,
         whole_string_reversed_variants,
         per_word_reversed_variants,
@@ -745,7 +747,6 @@ ALREADY_TRIED = [
         part_separated_and_number_mutated,
         suffix_variants_short,
         prefix_variants_short,
-        # ~1M
         suffix_variants_long,
         prefix_variants_long,
         single_word_substitution_variants,
@@ -766,6 +767,14 @@ ALREADY_TRIED = [
         delete_two_positions,
         duplicate_two_positions,
         insert_two_positions,
+        leet_two_positions,        # ~150  (leet 2 chars, ENRICHED map: +c +h +alt symbols)
+        reverse_two_words,         # 3     (reverse 2 of the 3 bare words in place)
+        grow_both_numbers,         # 200   (add a digit to BOTH numbers, append/prepend)
+
+        rearranged_number_and_exhaustive_case,
+                    separated_number_and_exhaustive_case,
+                    part_order_number_and_exhaustive_case,
+                    part_separated_number_and_exhaustive_case,
     ]
 
 # EVERYTHING, re-ordered cheapest-first so trivial hits surface quickly
@@ -789,9 +798,24 @@ ALREADY_TRIED = [
 # (a4 g6 h# c( ...); (2) token-level same-kind edits earlier pools never
 # isolated. ~350 candidates, ~1s online.
 MUTATION_PATTERNS = [
-        leet_two_positions,        # ~150  (leet 2 chars, ENRICHED map: +c +h +alt symbols)
-        reverse_two_words,         # 3     (reverse 2 of the 3 bare words in place)
-        grow_both_numbers,         # 200   (add a digit to BOTH numbers, append/prepend)
+            # millions -> hundreds of millions (exhaustive per-letter case)
+            
+            # single trivial edits + exhaustive number replacement
+            # (2nd full sweep after the pledgeor fix -- no hit)
+            leet_variants,
+            number_value_variants,
+            append_prepend_common_tokens,
+            number_bruteforce_single,
+            number_bruteforce_both,
+            # two-location char edits (fully exhausted online, no hit)
+            transpose_two_positions,
+            delete_two_positions,
+            duplicate_two_positions,
+            insert_two_positions,
+            leet_two_positions,        # ~150  (leet 2 chars, ENRICHED map: +c +h +alt symbols)
+            reverse_two_words,         # 3     (reverse 2 of the 3 bare words in place)
+            grow_both_numbers,         # 200   (add a dig
+
     ]
 
 # PARKED (deliberately NOT in MUTATION_PATTERNS): two whole-word dictionary

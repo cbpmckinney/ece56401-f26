@@ -1,0 +1,19 @@
+{'password': 'aw2246french44pledgeor', 'guesses': Decimal('211622500000000000'), 'guesses_log10': 17.325561840614366, 'sequence': [
+        {'pattern': 'bruteforce', 'token': 'aw2246', 'i': 0, 'j': 5, 'guesses': 1000000, 'guesses_log10': 5.999999999999999
+        },
+        {'pattern': 'dictionary', 'i': 6, 'j': 11, 'token': 'french', 'matched_word': 'french', 'rank': 225, 'dictionary_name': 'english_wikipedia', 'reversed': False, 'l33t': False, 'base_guesses': 225, 'uppercase_variations': 1, 'l33t_variations': 1, 'guesses': 225, 'guesses_log10': 2.3521825181113623
+        },
+        {'pattern': 'repeat', 'i': 12, 'j': 13, 'token': '44', 'base_token': '4', 'base_guesses': Decimal('12'), 'base_matches': [
+                {'pattern': 'bruteforce', 'token': '4', 'i': 0, 'j': 0, 'guesses': 11, 'guesses_log10': 1.041392685158225
+                }
+            ], 'repeat_count': 2.0, 'guesses': 50, 'guesses_log10': 1.6989700043360185
+        },
+        {'pattern': 'dictionary', 'i': 14, 'j': 19, 'token': 'pledge', 'matched_word': 'pledge', 'rank': 2987, 'dictionary_name': 'us_tv_and_film', 'reversed': False, 'l33t': False, 'base_guesses': 2987, 'uppercase_variations': 1, 'l33t_variations': 1, 'guesses': 2987, 'guesses_log10': 3.475235222604128
+        },
+        {'pattern': 'dictionary', 'i': 20, 'j': 21, 'token': 'or', 'matched_word': 'or', 'rank': 23, 'dictionary_name': 'english_wikipedia', 'reversed': False, 'l33t': False, 'base_guesses': 23, 'uppercase_variations': 1, 'l33t_variations': 1, 'guesses': 50, 'guesses_log10': 1.6989700043360185
+        }
+    ], 'calc_time': datetime.timedelta(microseconds=1398), 'crack_times_seconds': {'online_throttling_100_per_hour': Decimal('7618410000000000422.906709652'), 'online_no_throttling_10_per_second': Decimal('21162250000000000'), 'offline_slow_hashing_1e4_per_second': Decimal('21162250000000'), 'offline_fast_hashing_1e10_per_second': Decimal('21162250')
+    }, 'crack_times_display': {'online_throttling_100_per_hour': 'centuries', 'online_no_throttling_10_per_second': 'centuries', 'offline_slow_hashing_1e4_per_second': 'centuries', 'offline_fast_hashing_1e10_per_second': '8 months'
+    }, 'score': 4, 'feedback': {'warning': '', 'suggestions': []
+    }
+}
